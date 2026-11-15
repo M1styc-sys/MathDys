@@ -1,5 +1,15 @@
 # Nouveautés de MathDys
 
+## Version 1.0.0 — première version officielle
+- **Vérifier ses étapes** (F9) : signale la ligne où une erreur s'est glissée dans une équation, une inéquation ou un calcul, sans donner la réponse.
+- **Aide-mémoire** : 27 formules du programme du collège et du lycée, à retrouver avec Ctrl+K.
+- **Mes abréviations** : ses propres raccourcis, dans le texte comme dans les calculs.
+- **Chiffres et lettres en couleur** dans les formules (activé par le réglage « dyscalculie »).
+- **Pages rangées par matière** ; Ctrl+K retrouve aussi les pages.
+- **🐞 Signaler un bug** : un message prêt à envoyer, avec les informations utiles (sans le cahier ni le nom).
+- **Éditeur de formules dans le dépôt** (dossier `lib/`, facultatif) : plus aucun service extérieur pour l'éditeur.
+- **Tests automatiques** à chaque envoi sur GitHub, guide pour contribuer (CONTRIBUTING.md), sommaire en tête du code.
+
 ## Version 0.4.2
 - Nouvelle adresse : **https://mathdys.github.io**
 - Cliquer n'importe où sur une ligne (même à droite de la formule ou sur une ligne vide) y place le curseur.

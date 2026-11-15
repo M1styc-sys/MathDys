@@ -98,6 +98,8 @@ math-field:focus-within{outline:none}
 math-field::part(virtual-keyboard-toggle),math-field::part(menu-toggle){display:none}
 body.vkb math-field::part(virtual-keyboard-toggle){display:flex}
 .calcmsg{font-size:.7em;color:var(--ko);padding:0 .4em}
+.calcmsg.ok{color:var(--ok);font-weight:600}
+.calcmsg.ko{color:var(--ko);font-weight:600}
 /* lignes de texte */
 .txt{outline:none;padding:.25em .3em;min-height:1.6em;white-space:pre-wrap;word-wrap:break-word}
 .txt:empty:before{content:attr(data-ph);color:var(--muted)}

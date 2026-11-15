@@ -1,3 +1,30 @@
+/*
+  MathDys — cahier de maths pour les élèves multi-dys (licence GNU GPL v3)
+  https://mathdys.github.io
+
+  SOMMAIRE (cherche le titre avec Ctrl+F) :
+   - Catalogue des symboles
+   - État + sauvegarde
+   - Types de blocs
+   - Annuler / Rétablir pour tout le cahier
+   - Rendu
+   - Vérifier ses étapes (F9) : signale la ligne où une erreur s'est glissée, sans donner la réponse
+   - Lecture à voix haute (synthèse vocale du navigateur, rien n'est envoyé)
+   - Parenthèses colorées par paire
+   - Réglages tout prêts
+   - Clavier
+   - Barre d'outils
+   - Aide
+   - Fenêtres, réglages, pages
+   - Export : texte lisible, LaTeX, Word / LibreOffice
+   - Fichiers sur l'ordinateur (aucun compte, aucun serveur)
+   - Signaler un bug
+   - Hors ligne : installation comme une application
+   - Auto-test (ouvrir le site avec #test à la fin de l'adresse)
+   - Démarrage
+
+  Voir CONTRIBUTING.md pour l'organisation du projet.
+*/
 (function(){
 'use strict';
 const MFE = window.MathfieldElement || (window.MathLive && window.MathLive.MathfieldElement);
@@ -104,6 +131,7 @@ const CATALOG=[
   ['🌳','Arbre de probabilités','@tree',null,1,'arbre pondéré branches'],
   ['+−','Opération posée','@op',null,0,'addition soustraction multiplication division poser'],
   ['🖼','Image de l\u2019énoncé','@img',null,0,'photo capture énoncé'],
+  ['🐞','Signaler un bug ou proposer une idée','@bug',null,0,'problème erreur contact aide'],
   ['P(A)','Probabilité de A','P\\left(#?\\right)',null,1,''],
   ['Ā','Contraire (barre)','\\overline{#?}','barre',1,'complémentaire événement'],
   ['∩','Intersection (et)','\\cap','inter',1,'et'],
@@ -125,6 +153,35 @@ const CATALOG=[
   ['→AB','Vecteur','\\overrightarrow{#?}','vec',2,''],
   ['‖u‖','Norme','\\left\\|#?\\right\\|',null,2,'longueur vecteur'],
  ]},
+ {cat:'Formules', items:[
+  ['(a+b)²','Identité remarquable (a+b)²','\\left(a+b\\right)^2=a^2+2ab+b^2',null,1,'développer carré somme'],
+  ['(a−b)²','Identité remarquable (a−b)²','\\left(a-b\\right)^2=a^2-2ab+b^2',null,1,'développer carré différence'],
+  ['(a+b)(a−b)','Identité remarquable (a+b)(a−b)','\\left(a+b\\right)\\left(a-b\\right)=a^2-b^2',null,1,'différence de deux carrés factoriser'],
+  ['Pythagore','Théorème de Pythagore','BC^2=AB^2+AC^2',null,1,'triangle rectangle hypoténuse'],
+  ['Thalès','Théorème de Thalès','\\frac{AM}{AB}=\\frac{AN}{AC}=\\frac{MN}{BC}',null,1,'proportionnalité triangle'],
+  ['πr²','Aire d\u2019un disque','\\mathcal{A}=\\pi r^2',null,1,'cercle rayon surface'],
+  ['2πr','Périmètre d\u2019un cercle','P=2\\pi r',null,1,'circonférence rayon'],
+  ['b×h/2','Aire d\u2019un triangle','\\mathcal{A}=\\frac{b\\times h}{2}',null,1,'base hauteur surface'],
+  ['V cyl.','Volume d\u2019un cylindre','V=\\pi r^2h',null,1,'volume'],
+  ['V cône','Volume d\u2019un cône ou d\u2019une pyramide','V=\\frac{\\mathcal{B}\\times h}{3}',null,1,'volume pyramide'],
+  ['v=d/t','Vitesse moyenne','v=\\frac{d}{t}',null,1,'distance temps'],
+  ['sin, cos, tan','Trigonométrie dans le triangle rectangle','\\cos\\widehat{A}=\\frac{\\text{adjacent}}{\\text{hypoténuse}}',null,1,'cosinus sinus tangente soh cah toa'],
+  ['Δ','Discriminant','\\Delta=b^2-4ac',null,2,'second degré trinôme'],
+  ['x₁, x₂','Solutions du second degré','x=\\frac{-b\\pm\\sqrt{\\Delta}}{2a}',null,2,'racines trinôme'],
+  ['(xⁿ)\u2032','Dérivée de xⁿ','\\left(x^n\\right)\'=nx^{n-1}',null,2,'dérivée puissance'],
+  ['(1/x)\u2032','Dérivée de 1/x','\\left(\\frac{1}{x}\\right)\'=-\\frac{1}{x^2}',null,2,'dérivée inverse'],
+  ['(√x)\u2032','Dérivée de √x','\\left(\\sqrt{x}\\right)\'=\\frac{1}{2\\sqrt{x}}',null,2,'dérivée racine'],
+  ['(eˣ)\u2032','Dérivée de l\u2019exponentielle','\\left(e^x\\right)\'=e^x',null,2,'dérivée exp'],
+  ['(uv)\u2032','Dérivée d\u2019un produit','\\left(uv\\right)\'=u\'v+uv\'',null,2,'dérivée produit'],
+  ['(u/v)\u2032','Dérivée d\u2019un quotient','\\left(\\frac{u}{v}\\right)\'=\\frac{u\'v-uv\'}{v^2}',null,2,'dérivée quotient'],
+  ['tangente','Équation de la tangente','y=f\'\\left(a\\right)\\left(x-a\\right)+f\\left(a\\right)',null,2,'tangente dérivée'],
+  ['uₙ arith.','Suite arithmétique','u_n=u_0+nr',null,2,'raison suite'],
+  ['uₙ géom.','Suite géométrique','u_n=u_0\\times q^n',null,2,'raison suite'],
+  ['1+…+n','Somme des entiers','1+2+\\cdots+n=\\frac{n\\left(n+1\\right)}{2}',null,2,'somme suite'],
+  ['cos²+sin²','cos² + sin² = 1','\\cos^2x+\\sin^2x=1',null,2,'trigonométrie'],
+  ['P(A∪B)','Probabilité de A ou B','P\\left(A\\cup B\\right)=P\\left(A\\right)+P\\left(B\\right)-P\\left(A\\cap B\\right)',null,2,'union probabilité'],
+  ['P(X=k)','Loi binomiale','P\\left(X=k\\right)=\\binom{n}{k}p^k\\left(1-p\\right)^{n-k}',null,2,'binomiale bernoulli'],
+ ]},
  {cat:'Grec', items:[
   ['α','alpha','\\alpha','alpha',1,''],['β','bêta','\\beta','beta',1,''],['γ','gamma','\\gamma','gamma',2,''],
   ['δ','delta','\\delta','delta',2,''],['Δ','Delta (discriminant)','\\Delta','Delta',2,'discriminant'],
@@ -136,9 +193,13 @@ const ALLSYM=[]; CATALOG.forEach(c=>c.items.forEach(a=>ALLSYM.push({cat:c.cat,sy
 const NATIVE=new Set(['/','^','_','(','[','%','*']);
 const SHORTCUTS={'fois':'\\times','*':'\\times'};
 ALLSYM.forEach(s=>{ if(s.key && !NATIVE.has(s.key)) SHORTCUTS[s.key]=s.tpl.replace(/#@/g,'#?'); });
+function userAbbr(){ // « abréviation = texte », une par ligne (Réglages)
+  const m={}; (state&&state.settings&&state.settings.abbr||'').split('\n').forEach(l=>{ const i=l.indexOf('='); if(i<1) return;
+    const k=l.slice(0,i).trim(), v=l.slice(i+1).trim(); if(/^[a-zA-Z]{2,12}$/.test(k) && v) m[k]=v; }); return m; }
 function shortcutsFor(defaults){
   // retire les raccourcis par défaut qui empêcheraient les nôtres (ex. « in » avant « inf »)
   const out=Object.assign({},defaults||{});
+  const ua=userAbbr(); Object.entries(ua).forEach(([k,v])=>{ SHORTCUTS[k]= /[\\^_{}]/.test(v) ? v : '\\text{'+v.replace(/[{}\\]/g,'')+'}'; });
   const mine=Object.keys(SHORTCUTS);
   Object.keys(out).forEach(d=>{ if(mine.some(m=>m!==d && m.startsWith(d))) delete out[d]; });
   return Object.assign(out,SHORTCUTS);
@@ -165,7 +226,7 @@ function defaults(){
     {id:uid(),type:'text',value:'Astuce : place-toi sur une ligne et fais Ctrl+D pour la recopier, puis corrige seulement ce qui change.'},
     {id:uid(),type:'math',value:''}
   ];
-  return {pages:[p], current:p.id, settings:{level:'college', fs:20, lh:1.6, font:"'Lexend', Arial, sans-serif", theme:'clair', align:true, labels:true, check:true, focus:false, parens:false, rate:1, name:'', simple:false, vkb:'auto', teacher:false}, seenHelp:false};
+  return {pages:[p], current:p.id, settings:{level:'college', fs:20, lh:1.6, font:"'Lexend', Arial, sans-serif", theme:'clair', align:true, labels:true, check:true, focus:false, parens:false, rate:1, name:'', simple:false, vkb:'auto', teacher:false, digits:false, abbr:''}, seenHelp:false};
 }
 let canStore=true;
 function load(){
@@ -291,7 +352,7 @@ function buildMath(row,body){
   mf.setAttribute('math-virtual-keyboard-policy',vkbOn()?'auto':'manual');
   body.append(mf);
   const msg=document.createElement('div'); msg.className='calcmsg'; body.append(msg);
-  mf.addEventListener('input',()=>{ row.value=mf.value; msg.textContent=''; scheduleSave(); scheduleAlign(); });
+  mf.addEventListener('input',()=>{ row.value=mf.value; msg.textContent=''; msg.className='calcmsg'; scheduleSave(); scheduleAlign(); });
   mf.addEventListener('move-out',e=>{
     const d=e.detail && e.detail.direction;
     if(d==='upward'){ const p=prevId(row.id); if(p){ e.preventDefault(); focusRow(p,'end'); } }
@@ -332,6 +393,15 @@ function buildText(row,body){
   const upd=()=>t.classList.toggle('title',/^#\s/.test(t.textContent));
   upd();
   t.addEventListener('input',()=>{ row.value=t.innerText.replace(/\n$/,''); upd(); scheduleSave(); });
+  // abréviations personnelles : remplacées quand on tape une espace ou une ponctuation
+  t.addEventListener('keydown',e=>{
+    if(e.ctrlKey||e.metaKey||e.altKey || !/^[ .,;:!?)]$/.test(e.key)) return;
+    const ua=userAbbr(); const sel=getSelection(); if(!sel.rangeCount || !sel.isCollapsed) return;
+    const node=sel.anchorNode, off=sel.anchorOffset; if(!node || node.nodeType!==3 || !t.contains(node)) return;
+    const before=node.nodeValue.slice(0,off); const m=before.match(/(^|[\s(«"'])([a-zA-Z]{2,12})$/); if(!m || !ua[m[2]]) return;
+    const start=off-m[2].length; node.nodeValue=node.nodeValue.slice(0,start)+ua[m[2]]+node.nodeValue.slice(off);
+    const r=document.createRange(); r.setStart(node,start+ua[m[2]].length); r.collapse(true); sel.removeAllRanges(); sel.addRange(r);
+  });
   t.addEventListener('paste',e=>{ e.preventDefault(); const s=(e.clipboardData||window.clipboardData).getData('text'); document.execCommand('insertText',false,s); });
   body.append(t);
 }
@@ -1013,10 +1083,16 @@ function renderPage(){
   setTimeout(alignAll,60); setTimeout(alignAll,400); setTimeout(alignAll,1200);
   HIST.stable=snap();
 }
+const subjects=()=>[...new Set(state.pages.map(p=>p.subject).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'fr'));
 function renderPageList(){
   const sel=document.getElementById('pageSel'); sel.innerHTML='';
-  state.pages.forEach(p=>{ const o=document.createElement('option'); o.value=p.id; o.textContent=p.title||'Sans titre'; if(p.id===state.current) o.selected=true; sel.append(o); });
-  const o=document.createElement('option'); o.value='__del'; o.textContent='🗑 Supprimer cette page…'; sel.append(o);
+  const groups=subjects(); const opt=p=>{ const o=document.createElement('option'); o.value=p.id; o.textContent=p.title||'Sans titre'; if(p.id===state.current) o.selected=true; return o; };
+  groups.forEach(g=>{ const og=document.createElement('optgroup'); og.label='📁 '+g; state.pages.filter(p=>p.subject===g).forEach(p=>og.append(opt(p))); sel.append(og); });
+  const rest=state.pages.filter(p=>!p.subject);
+  if(groups.length && rest.length){ const og=document.createElement('optgroup'); og.label='Sans matière'; rest.forEach(p=>og.append(opt(p))); sel.append(og); } else rest.forEach(p=>sel.append(opt(p)));
+  const og=document.createElement('optgroup'); og.label='────────';
+  const o2=document.createElement('option'); o2.value='__subj'; o2.textContent='📁 Ranger cette page dans une matière…'; og.append(o2);
+  const o=document.createElement('option'); o.value='__del'; o.textContent='🗑 Supprimer cette page…'; og.append(o); sel.append(og);
   document.getElementById('pageTitle').value=page().title||'';
   refreshFileStatus();
 }
@@ -1238,6 +1314,94 @@ function alignAll(){
 }
 window.addEventListener('resize',scheduleAlign);
 
+/* ============ Vérifier ses étapes (F9) : signale la ligne où une erreur s'est glissée, sans donner la réponse ============ */
+const RELS=[['\\leq','le'],['\\geq','ge'],['\\le','le'],['\\ge','ge'],['\\ne','ne'],['\\lt','lt'],['\\gt','gt'],['=','eq'],['<','lt'],['>','gt']];
+function splitRel(src){ // découpe au premier niveau : 3x+2=8, x<5, a=b=c…
+  const s=braceify(src||''); const parts=[], rels=[]; let d=0, cur='', i=0;
+  while(i<s.length){ const c=s[i];
+    if(c==='{') d++; if(c==='}') d--;
+    if(d===0){ const r=RELS.find(([t])=>s.startsWith(t,i) && !(t[0]==='\\' && /[a-zA-Z]/.test(s[i+t.length]||'')));
+      if(r && !(r[0]==='<'&&s[i+1]==='=') ){ parts.push(cur); rels.push(r[1]); cur=''; i+=r[0].length; continue; } }
+    cur+=c; i++; }
+  parts.push(cur); return {parts,rels};
+}
+function varsOf(src){ const n=normLatex(src); if(n===null) return null;
+  const t=n.replace(/sqrt|sin|cos|tan|ln|log|exp|abs|pi/g,' '); const v=new Set((t.match(/[a-zA-Z]/g)||[]).filter(c=>c!=='e')); return [...v]; }
+function sampleEnvs(vars,n){ const out=[]; let seed=7;
+  const rnd=()=>{ seed=(seed*16807)%2147483647; return seed/2147483647; };
+  for(let k=0;k<n;k++){ const e={}; vars.forEach(v=>{ e[v]=Math.round((rnd()*9-4.5)*1000)/1000+0.137; }); out.push(e); } return out; }
+const nearEq=(a,b)=>Math.abs(a-b)<=1e-7*Math.max(1,Math.abs(a),Math.abs(b));
+function sameExpr(a,b,vars){ // deux expressions égales pour toutes les valeurs ?
+  const fa=compileExpr(a,vars), fb=compileExpr(b,vars); if(!fa||!fb) return null;
+  let n=0; for(const e of sampleEnvs(vars,10)){ const x=fa(e), y=fb(e); if(!isFinite(x)||!isFinite(y)) continue; n++; if(!nearEq(x,y)) return false; }
+  return n>=3 ? true : null;
+}
+function stepInfo(latex){
+  const {parts,rels}=splitRel(latex); if(parts.length<2) return {kind:'expr',parts};
+  const vars=varsOf(latex); if(vars===null) return {kind:'unknown'};
+  if(parts[0].trim()==='' && rels[0]==='eq') return {kind:'cont',parts:parts.slice(1),rels:rels.slice(1),vars}; // ligne qui commence par « = »
+  return {kind:'rel',parts,rels,vars};
+}
+function relFunc(info){ // forme « f(x) = 0 » ou « f(x) > 0 » de la ligne
+  const i0=0, i1=info.parts.length-1, r=info.rels[0];
+  if(!info.rels.every(x=>x===info.rels[0] || x==='eq')) return null;
+  const main=info.rels.find(x=>x!=='eq')||'eq';
+  const L=info.parts[i0], R=info.parts[i1];
+  const sign = (main==='lt'||main==='le') ? -1 : 1;
+  const fL=compileExpr(L,info.vars), fR=compileExpr(R,info.vars); if(!fL||!fR) return null;
+  return {f:e=>sign*(fL(e)-fR(e)), type: main==='eq'?'eq':main==='ne'?'ne':(main==='lt'||main==='gt')?'strict':'large'};
+}
+function equivalent(a,b,vars){ // b découle-t-elle de a (opérations sur les deux membres) ?
+  if(a.type!==b.type) return false;
+  let r0=null, n=0;
+  for(const e of sampleEnvs(vars,12)){ const x=a.f(e), y=b.f(e); if(!isFinite(x)||!isFinite(y)) continue;
+    if(Math.abs(x)<1e-9 && Math.abs(y)<1e-9) continue;
+    if(Math.abs(x)<1e-9 || Math.abs(y)<1e-9) return false;
+    const r=y/x; if(r0===null) r0=r; else if(!nearEq(r,r0)) return false; n++; }
+  if(n<3 || r0===null) return null;
+  if(a.type!=='eq' && a.type!=='ne' && r0<0) return false; // inégalité : le sens doit suivre
+  return true;
+}
+function checkSteps(){
+  const R=page().rows; let ok=0, bad=0, unk=0, prev=null;
+  const mark=(r,cls,txt)=>{ const el=els.get(r.id); const m=el&&el.querySelector('.calcmsg'); if(m){ m.className='calcmsg '+cls; m.textContent=txt; } };
+  R.forEach(r=>{
+    if(r.type!=='math' || !(r.value||'').trim()){ if(r.type!=='math') prev=null; return; }
+    const info=stepInfo(r.value);
+    if(info.kind==='expr'||info.kind==='unknown'){ prev=null; return; }
+    // 1. les égalités à l'intérieur de la ligne (a = b = c : b et c doivent être égaux)
+    let lineOk=true;
+    const start = info.kind==='cont' ? 0 : 1;
+    for(let i=start;i<info.parts.length-1;i++){ if(info.rels[i]!=='eq') continue; const s=sameExpr(info.parts[i],info.parts[i+1],info.vars); if(s===false){ lineOk=false; break; } }
+    if(info.kind==='cont'){ // « = … » continue le calcul de la ligne du dessus
+      let s = prev&&prev.last!=null ? sameExpr(prev.last,info.parts[0],[...new Set(prev.vars.concat(info.vars))]) : null;
+      if(s===false||!lineOk){ bad++; mark(r,'ko','✗ À revoir : ce calcul ne donne pas le même résultat que la ligne du dessus.'); }
+      else if(s===true){ ok++; mark(r,'ok','✓ Étape juste'); } else unk++;
+      prev={last:info.parts[info.parts.length-1],vars:info.vars,rel:prev&&prev.rel}; return;
+    }
+    if(!lineOk){ bad++; mark(r,'ko','✗ À revoir : une égalité de cette ligne est fausse.'); prev=null; return; }
+    const first=sameExpr(info.parts[0],info.parts[1],info.vars);
+    if(info.vars.length===0){ // que des nombres : l'égalité est-elle vraie ?
+      const rf=relFunc(info); let t=null;
+      if(rf){ const v=rf.f({}); t = rf.type==='eq'? Math.abs(v)<1e-9 : rf.type==='ne'? Math.abs(v)>1e-9 : rf.type==='strict'? v>1e-12 : v>-1e-12; }
+      if(t===false){ bad++; mark(r,'ko','✗ À revoir : ce calcul est faux.'); } else if(t===true){ ok++; mark(r,'ok','✓ Calcul juste'); } else unk++;
+      prev={last:info.parts[info.parts.length-1],vars:[]}; return;
+    }
+    if(first===true && info.rels.every(x=>x==='eq')){ // développement / factorisation : a = b vrai pour tout x
+      ok++; mark(r,'ok','✓ Égalité juste'); prev={last:info.parts[info.parts.length-1],vars:info.vars}; return; }
+    const rf=relFunc(info);
+    if(prev && prev.rel && rf){
+      const allVars=[...new Set(prev.vars.concat(info.vars))];
+      const eqv=equivalent(prev.rel,rf,allVars);
+      if(eqv===false){ bad++; mark(r,'ko','✗ À revoir : cette ligne ne découle pas de celle du dessus.'); }
+      else if(eqv===true){ ok++; mark(r,'ok','✓ Étape juste'); } else unk++;
+    }
+    prev={rel:rf,vars:info.vars,last:info.parts[info.parts.length-1]};
+  });
+  if(!ok && !bad) toast('Rien à vérifier ici : écris une équation sur plusieurs lignes (ex. 3x+2=8, puis 3x=6)');
+  else toast(bad ? (bad===1?'1 ligne à revoir':bad+' lignes à revoir')+(ok?' · '+ok+' juste'+(ok>1?'s':''):'') : 'Tout est juste ('+ok+' étape'+(ok>1?'s':'')+')');
+}
+
 /* ============ Lecture à voix haute (synthèse vocale du navigateur, rien n'est envoyé) ============ */
 function latexToSpeech(src){
   let t=' '+braceify(src||'')+' ';
@@ -1310,9 +1474,11 @@ const PCOL=['var(--accent)','var(--d)','var(--c)','var(--dec)'];
 function colorParens(mf){
   if(!mf||!mf.shadowRoot) return;
   const root=mf.shadowRoot.querySelector('.ML__content')||mf.shadowRoot;
-  const on=state.settings.parens; let depth=0;
+  const on=state.settings.parens, dg=state.settings.digits; let depth=0;
   const w=document.createTreeWalker(root,NodeFilter.SHOW_TEXT); let n;
   while((n=w.nextNode())){ const ch=n.nodeValue.trim(); const el=n.parentElement; if(!el) continue;
+    if(/^[0-9.,]+$/.test(ch)){ el.style.color=dg?'var(--u)':''; continue; }
+    if(/^[a-zA-Z]$/.test(ch)){ el.style.color=dg?'var(--dec)':''; continue; }
     if(ch==='('||ch==='['){ if(on) el.style.color=PCOL[depth%PCOL.length], el.style.fontWeight='700'; else el.style.color=el.style.fontWeight=''; depth++; }
     else if(ch===')'||ch===']'){ depth=Math.max(0,depth-1); if(on) el.style.color=PCOL[depth%PCOL.length], el.style.fontWeight='700'; else el.style.color=el.style.fontWeight=''; } }
 }
@@ -1320,10 +1486,10 @@ function colorAllParens(){ document.querySelectorAll('math-field').forEach(color
 
 /* ============ Réglages tout prêts ============ */
 const PRESETS={
-  defaut:{simple:false,fs:20,lh:1.6,font:"'Lexend', Arial, sans-serif",theme:'clair',align:true,labels:true,check:true,focus:false,parens:false,rate:1},
+  defaut:{simple:false,digits:false,fs:20,lh:1.6,font:"'Lexend', Arial, sans-serif",theme:'clair',align:true,labels:true,check:true,focus:false,parens:false,rate:1},
   dyspraxie:{simple:true,fs:24,lh:1.8,font:"'Lexend', Arial, sans-serif",theme:'clair',align:true,labels:true,check:true,focus:false,parens:true,rate:1},
   dyslexie:{simple:true,fs:22,lh:2.0,font:"'Andika', Arial, sans-serif",theme:'creme',align:true,labels:true,check:true,focus:true,parens:true,rate:0.9},
-  dyscalculie:{simple:true,fs:22,lh:1.8,font:"'Atkinson Hyperlegible', Arial, sans-serif",theme:'creme',align:true,labels:true,check:true,focus:false,parens:true,rate:0.85},
+  dyscalculie:{simple:true,digits:true,fs:22,lh:1.8,font:"'Atkinson Hyperlegible', Arial, sans-serif",theme:'creme',align:true,labels:true,check:true,focus:false,parens:true,rate:0.85},
 };
 function applyPreset(name){
   Object.assign(state.settings,PRESETS[name]); applySettings(); syncSettingsUI(); colorAllParens(); renderTools(); scheduleSave(false);
@@ -1335,6 +1501,7 @@ window.addEventListener('keydown',e=>{
   if(e.key==='F1'){ e.preventDefault(); openDlg('helpDlg'); return; }
   if(e.key==='F2'){ e.preventDefault(); if(e.shiftKey) speakPage(); else speakCurrent(); return; }
   if(e.key==='F8'){ e.preventDefault(); toggleFocus(); return; }
+  if(e.key==='F9'){ e.preventDefault(); checkSteps(); return; }
   if(e.key==='Escape'){ const o=document.querySelectorAll('.overlay.open'); if(o.length){ e.preventDefault(); e.stopPropagation(); o.forEach(x=>x.classList.remove('open')); if(currentId) focusRow(currentId,'end'); } return; }
   if(document.querySelector('.overlay.open')) return;
   const ctrl=e.ctrlKey||e.metaKey; const k=e.key.toLowerCase();
@@ -1430,6 +1597,7 @@ function renderTools(){
   }
   act('Dupliquer','Ctrl+D',()=>{ if(currentId) duplicate(currentId); },'Recopier la ligne en dessous (Ctrl+D)');
   if(!simple) act('Calculer','Ctrl+Entrée',()=>{ const r=currentId&&rowById(currentId); if(r&&r.type==='math') compute(currentId); else toast('Place-toi sur une ligne de calcul'); });
+  act('✓ Vérifier','F9',checkSteps,'Vérifier mes étapes de calcul : signale la ligne où une erreur s\u2019est glissée (F9)');
   act('🔊 Lire','F2',speakCurrent,'Lire la ligne à voix haute (F2 ; Maj+F2 : toute la page). Appuie encore pour arrêter.');
   const fb=act('🎯','F8',toggleFocus,'Mode concentration : estomper les autres lignes (F8)','focusBtn'); if(state.settings.focus) fb.classList.add('primary');
   act('🔍 Symbole','Ctrl+K',openSearch,'Chercher un symbole ou un outil par son nom (Ctrl+K)');
@@ -1471,6 +1639,7 @@ function targetMF(){
 }
 function insertTpl(tpl){
   if(tpl==='@tabsign'){ addRowAfter(currentId,'tab',newTab('sign')); return; }
+  if(tpl==='@bug'){ openBug(); return; }
   if(tpl==='@img'){ const r=addRowAfter(currentId,'img'); pickImageFor(r.id); return; }
   if(tpl[0]==='@'){ addRowAfter(currentId,tpl.slice(1)); return; }
   const mf=targetMF(); if(!mf) return;
@@ -1494,6 +1663,7 @@ function doSearch(){
       let sc= !q?1 : deacc(s.name).startsWith(q)?3 : hay.split(/\s+/).some(w=>w.startsWith(q))?2 : hay.includes(q)?1:0;
       if(sc && s.lvl<=L) sc+=0.5; return {s,sc}; })
     .filter(x=>x.sc>0).sort((a,b)=>b.sc-a.sc).slice(0,40).map(x=>x.s);
+  if(q) state.pages.forEach(p=>{ if(p.id!==state.current && deacc((p.title||'')+' '+(p.subject||'')).includes(q)) srchRes.unshift({page:p.id,sym:'📄',name:p.title||'Sans titre',cat:p.subject||'Page',kw:''}); });
   srchSel=0; paintSearch();
 }
 function paintSearch(){
@@ -1509,6 +1679,7 @@ function paintSearch(){
 }
 function pickSearch(i){
   const s=srchRes[i]; document.getElementById('srchDlg').classList.remove('open'); if(!s) return;
+  if(s.page){ state.current=s.page; renderPage(); scheduleSave(false); const R=page().rows; if(R.length) focusRow(R[R.length-1].id,'end'); return; }
   if(srchMF && document.body.contains(srchMF)){ lastMF=srchMF; const r=srchMF.closest('.row'); if(r) setCurrent(r.dataset.id); }
   insertTpl(s.tpl);
   if(s.key && !NATIVE.has(s.key)) toast('Astuce : la prochaine fois, tape « '+s.key+' »');
@@ -1588,6 +1759,10 @@ function renderHelp(){
   ]);
   h+='<p style="font-size:.75em;color:var(--muted);margin-top:1em">Les boutons de la barre du haut font la même chose et rappellent le raccourci : utilise-les au début, puis passe au clavier. Ton travail est gardé dans ce navigateur en attendant, mais <b>pense à l\u2019enregistrer dans un fichier</b> (Ctrl+S) : c\u2019est lui qui compte.</p>';
   h+='<h3>Aides</h3>'+rows([
+    ['<kbd>F9</kbd>','<b>vérifier mes étapes</b> : MathDys signale la ligne où une erreur s\u2019est glissée (équations, inéquations, calculs, lignes qui commencent par « = »), sans donner la réponse'],
+    ['Ctrl+K → « Pythagore », « discriminant »…','l\u2019aide-mémoire : les formules du programme, à insérer en un clic. Ctrl+K retrouve aussi tes pages'],
+    ['Réglages → Mes abréviations','tes propres raccourcis, par exemple <code>ssi = si et seulement si</code>'],
+    ['Page → 📁 Ranger dans une matière','classer tes pages par matière ou par chapitre'],
     ['<kbd>F2</kbd>','lire la ligne à voix haute, en français (<kbd>Maj</kbd>+<kbd>F2</kbd> : toute la page). <kbd>F2</kbd> encore pour arrêter'],
     ['<kbd>F8</kbd>','mode concentration : seule la ligne en cours reste bien visible'],
     ['Réglages → Réglages tout prêts','dyspraxie, dyslexie, dyscalculie : un point de départ à ajuster'],
@@ -1609,6 +1784,7 @@ function renderHelp(){
     ['<kbd>Alt</kbd>+<kbd>↑</kbd> / <kbd>Alt</kbd>+<kbd>↓</kbd>','monter / descendre le bloc (ou ▲▼ à droite)'],
   ]);
   h+='<p style="font-size:.75em;margin-top:1em;color:var(--muted)">MathDys version '+APP_VERSION+'. Pour l\u2019avoir même sans Internet : ouvre le site une fois connecté, puis installe-le (icône ⊕ dans la barre d\u2019adresse de Chrome ou Edge).</p>';
+  h+='<p style="font-size:.75em;margin-top:1em">Un bug ? Une idée ? Bouton <b>🐞 Signaler un bug</b> en bas du cahier, ou Ctrl+K → « bug ».</p>';
   h+='<p style="font-size:.75em;margin-top:1em">Une idée, un bug ? Écris à <a href="mailto:git.public@protonmail.com?subject=MathDys">git.public@protonmail.com</a></p>';
   document.getElementById('helpBody').innerHTML=h;
 }
@@ -1622,8 +1798,13 @@ document.querySelectorAll('.overlay').forEach(o=>{
   o.addEventListener('click',e=>{ if(e.target===o||e.target.hasAttribute('data-close')){ o.classList.remove('open'); if(o.id==='helpDlg'&&!state.seenHelp){state.seenHelp=true;scheduleSave(false);} if(currentId) focusRow(currentId,'end'); } });
 });
 let askCb=null;
-function ask(text,cb){ document.getElementById('askText').textContent=text; askCb=cb; openDlg('askDlg'); }
-document.getElementById('askOk').addEventListener('click',()=>{ document.getElementById('askDlg').classList.remove('open'); if(askCb) askCb(); askCb=null; });
+function ask(text,cb,opt){ document.getElementById('askText').textContent=text; askCb=cb;
+  const inp=document.getElementById('askIn'); inp.style.display=opt&&opt.input?'':'none'; inp.value=opt&&opt.value||''; inp.placeholder=opt&&opt.placeholder||'';
+  const dl=document.getElementById('askList'); dl.innerHTML=''; (opt&&opt.list||[]).forEach(v=>{ const o=document.createElement('option'); o.value=v; dl.append(o); });
+  document.getElementById('askOk').textContent=opt&&opt.ok||'Oui';
+  openDlg('askDlg'); if(opt&&opt.input){ inp.focus(); inp.select(); } }
+document.getElementById('askIn').addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); document.getElementById('askOk').click(); } });
+document.getElementById('askOk').addEventListener('click',()=>{ document.getElementById('askDlg').classList.remove('open'); const v=document.getElementById('askIn').value; if(askCb) askCb(v); askCb=null; });
 
 function applySettings(){
   const s=state.settings, r=document.documentElement.style;
@@ -1639,15 +1820,19 @@ function syncSettingsUI(){ BOUND.forEach(([el,key])=>{ if(el.type==='checkbox') 
 document.querySelectorAll('[data-preset]').forEach(b=>b.addEventListener('click',()=>applyPreset(b.dataset.preset)));
 const bind=(id,key,conv,ev)=>{ const el=document.getElementById(id); BOUND.push([el,key]);
   if(el.type==='checkbox') el.checked=!!state.settings[key]; else el.value=state.settings[key];
-  el.addEventListener(ev||'input',()=>{ state.settings[key]= el.type==='checkbox'?el.checked:conv(el.value); applySettings(); if(key==='labels'||key==='check') renderPage(); if(key==='parens') colorAllParens(); if(key==='simple') renderTools(); if(key==='vkb'||key==='teacher') renderPage(); if(key==='teacher') toast(state.settings.teacher?'Mode professeur : survole une ligne et clique sur 🔓 pour la protéger':'Mode professeur désactivé'); scheduleSave(false); }); };
+  el.addEventListener(ev||'input',()=>{ state.settings[key]= el.type==='checkbox'?el.checked:conv(el.value); applySettings(); if(key==='labels'||key==='check') renderPage(); if(key==='parens') colorAllParens(); if(key==='simple') renderTools(); if(key==='vkb'||key==='teacher'||key==='abbr') renderPage(); if(key==='digits') colorAllParens(); if(key==='teacher') toast(state.settings.teacher?'Mode professeur : survole une ligne et clique sur 🔓 pour la protéger':'Mode professeur désactivé'); scheduleSave(false); }); };
 bind('sFs','fs',Number); bind('sLh','lh',Number); bind('sFont','font',String,'change'); bind('sTheme','theme',String,'change');
-bind('sName','name',String); bind('sFocus','focus',Boolean,'change'); bind('sParens','parens',Boolean,'change'); bind('sRate','rate',Number); bind('sSimple','simple',Boolean,'change'); bind('sTeacher','teacher',Boolean,'change'); bind('sVkb','vkb',String,'change'); bind('sAlign','align',Boolean,'change'); bind('sLabels','labels',Boolean,'change'); bind('sCheck','check',Boolean,'change');
+bind('sName','name',String); bind('sFocus','focus',Boolean,'change'); bind('sParens','parens',Boolean,'change'); bind('sRate','rate',Number); bind('sSimple','simple',Boolean,'change'); bind('sAbbr','abbr',String,'change'); bind('sDigits','digits',Boolean,'change'); bind('sTeacher','teacher',Boolean,'change'); bind('sVkb','vkb',String,'change'); bind('sAlign','align',Boolean,'change'); bind('sLabels','labels',Boolean,'change'); bind('sCheck','check',Boolean,'change');
 document.getElementById('levelSel').addEventListener('change',e=>{ state.settings.level=e.target.value; renderTools(); scheduleSave(false); toast('Niveau : '+e.target.selectedOptions[0].textContent); });
 document.getElementById('settingsBtn').addEventListener('click',()=>openDlg('setDlg'));
 document.getElementById('helpBtn').addEventListener('click',()=>openDlg('helpDlg'));
-document.getElementById('newPage').addEventListener('click',()=>{ const p=newPage(); state.pages.push(p); state.current=p.id; renderPage(); scheduleSave(); focusRow(p.rows[0].id,'end'); });
+document.getElementById('newPage').addEventListener('click',()=>{ const p=newPage(); if(page()&&page().subject) p.subject=page().subject; state.pages.push(p); state.current=p.id; renderPage(); scheduleSave(); focusRow(p.rows[0].id,'end'); });
 document.getElementById('pageSel').addEventListener('change',e=>{
   const v=e.target.value;
+  if(v==='__subj'){ e.target.value=state.current;
+    ask('Dans quelle matière ranger « '+(page().title||'Sans titre')+' » ?',val=>{ page().subject=(val||'').trim().slice(0,40)||undefined; renderPageList(); scheduleSave(); },
+      {input:true,value:page().subject||'',placeholder:'Maths, Physique, Chapitre 3…',list:subjects(),ok:'Ranger'});
+    return; }
   if(v==='__del'){ e.target.value=state.current;
     ask('Supprimer la page « '+(page().title||'Sans titre')+' » ?',()=>{ state.pages=state.pages.filter(p=>p.id!==state.current); if(!state.pages.length) state.pages.push(newPage()); state.current=state.pages[0].id; renderPage(); scheduleSave(); });
     return; }
@@ -1838,8 +2023,24 @@ function toast(t,actLabel,actFn){
   toastT=setTimeout(()=>el.classList.remove('show','act'), actLabel?6000:1800);
 }
 
+/* ============ Signaler un bug ============ */
+function bugInfo(){
+  const st=Object.assign({},state.settings); delete st.name; delete st.abbr;
+  return ['MathDys '+APP_VERSION, 'Adresse : '+location.origin+location.pathname, 'Navigateur : '+navigator.userAgent,
+    'Écran : '+innerWidth+'×'+innerHeight+' (zoom '+(window.devicePixelRatio||1)+')', 'Éditeur de formules : '+(MFE?'chargé':'NON chargé'),
+    'Hors ligne : '+(navigator.serviceWorker&&navigator.serviceWorker.controller?'actif':'non'), 'Réglages : '+JSON.stringify(st)].join('\n');
+}
+function openBug(){
+  document.getElementById('bugInfo').textContent=bugInfo(); openDlg('bugDlg'); document.getElementById('bugTxt').focus(); updBugMail();
+}
+function bugMessage(){ return (document.getElementById('bugTxt').value.trim()||'(décris ici le problème)')+'\n\n-----\n'+bugInfo(); }
+function updBugMail(){ document.getElementById('bugMail').href='mailto:git.public@protonmail.com?subject='+encodeURIComponent('MathDys '+APP_VERSION+' — bug ou idée')+'&body='+encodeURIComponent(bugMessage().slice(0,1800)); }
+document.getElementById('bugBtn').addEventListener('click',openBug);
+document.getElementById('bugTxt').addEventListener('input',updBugMail);
+document.getElementById('bugCopy').addEventListener('click',async()=>{ try{ await navigator.clipboard.writeText(bugMessage()); toast('Message copié : colle-le dans un mail à git.public@protonmail.com'); }catch(e){ toast('Copie refusée par le navigateur'); } });
+
 /* ============ Hors ligne : installation comme une application ============ */
-const APP_VERSION='0.4.2';
+const APP_VERSION='1.0.0';
 try{
   if('serviceWorker' in navigator && location.protocol==='https:' && window.self===window.top)
     navigator.serviceWorker.register('sw.js').catch(()=>{});
@@ -1865,6 +2066,13 @@ function runSelfTest(){
   const f=compileExpr('3x^{2}-2x+1',['x']); near('fonction 3x²−2x+1 en 2',f&&f({x:2}),9);
   const g=compileExpr('\\sin\\left(x\\right)',['x']); near('fonction sin(π/2)',g&&g({x:Math.PI/2}),1);
   const h=compileExpr('e^{x}',['x']); near('fonction eˣ en 0',h&&h({x:0}),1);
+  // vérifier ses étapes
+  { const a=relFunc(stepInfo('3x+2=8')), b=relFunc(stepInfo('3x=6')), c=relFunc(stepInfo('3x=10'));
+    eq('vérifier ses étapes : étape juste',a&&b&&equivalent(a,b,['x']),true);
+    eq('vérifier ses étapes : erreur repérée',a&&c&&equivalent(a,c,['x']),false);
+    const i1=relFunc(stepInfo('-2x<6')), i2=relFunc(stepInfo('x<-3'));
+    eq('vérifier ses étapes : sens d\u2019inégalité oublié',i1&&i2&&equivalent(i1,i2,['x']),false); }
+  eq('export texte lisible',latexToUnicode('x^{2}+\\sqrt2'),'x²+√2');
   // alignement
   eq('découpage au signe =',splitTopEq('3x+2=8').length,2);
   // opérations posées

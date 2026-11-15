@@ -1,9 +1,11 @@
-# MathDys - cahier de maths pour les élèves multi-dys
+# MathDys — cahier de maths pour les élèves multi-dys
+
+![Tests](https://github.com/mathdys/mathdys.github.io/actions/workflows/tests.yml/badge.svg)
 
 MathDys est un cahier de mathématiques en ligne pour prendre des notes **vite, au clavier, sans souris**.
 Il est pensé pour les élèves dyspraxiques, dyslexiques et dyscalculiques, de la primaire au lycée.
 
- **Utiliser MathDys : https://mathdys.github.io/**
+👉 **Utiliser MathDys : https://mathdys.github.io/**
 
 ## Ce qu'il sait faire
 
@@ -13,6 +15,9 @@ Il est pensé pour les élèves dyspraxiques, dyslexiques et dyscalculiques, de 
 - **Alignement automatique des `=`** d'une ligne à l'autre
 - **Ctrl+K** pour trouver n'importe quel symbole par son nom
 - **Calculatrice intégrée** (Ctrl+Entrée)
+- **Vérifier ses étapes** (F9) : MathDys signale la ligne où une erreur s'est glissée, sans donner la réponse
+- **Aide-mémoire** : les formules du programme (Pythagore, identités remarquables, dérivées…) dans Ctrl+K
+- **Mes abréviations** : ses propres raccourcis (`ssi` → « si et seulement si »)
 
 **Tous les outils de la primaire au lycée**
 - **Opérations posées** : addition, soustraction, multiplication, division, avec des colonnes colorées
@@ -22,7 +27,7 @@ Il est pensé pour les élèves dyspraxiques, dyslexiques et dyscalculiques, de 
 
 **Aides pour les dys**
 - **Lecture à voix haute** en français (F2)
-- **Mode concentration** (F8) et **parenthèses colorées**
+- **Mode concentration** (F8), **parenthèses colorées**, **chiffres et lettres en couleur**
 - **Réglages tout prêts** (dyspraxie, dyslexie, dyscalculie), polices adaptées (Lexend, Atkinson Hyperlegible, Andika), taille, interligne, thème crème ou sombre
 
 **Rendre son travail**
@@ -33,7 +38,7 @@ Il est pensé pour les élèves dyspraxiques, dyslexiques et dyscalculiques, de 
 - **Fiches d'exercices** : des lignes d'énoncé protégées que l'élève complète, sans pouvoir écraser la fiche
 
 **Confort**
-- **Mode simple**, **Annuler / Rétablir** pour tout le cahier, **déplacer les blocs**, **clavier de maths à l'écran** pour les tablettes
+- **Pages rangées par matière**, **Mode simple**, **Annuler / Rétablir** pour tout le cahier, **déplacer les blocs**, **clavier de maths à l'écran** pour les tablettes
 - Conçu pour être utilisable **au clavier seul** et avec un **lecteur d'écran**
 
 Toute l'aide est dans le logiciel : touche **F1**. Les nouveautés sont dans [CHANGELOG.md](CHANGELOG.md).
@@ -51,12 +56,16 @@ Dans Chrome ou Edge, vous pouvez aussi **l'installer comme une application** (ic
 
 ## Une idée ? Un bug ?
 
-Écrivez à **git.public@protonmail.com** ou ouvrez une *Issue* sur ce dépôt.
+Dans MathDys : bouton **🐞 Signaler un bug** en bas du cahier. Ou écrivez à **git.public@protonmail.com** ou ouvrez une *Issue* sur ce dépôt.
 Pour un bug, indiquez ce que vous faisiez, ce qui s'est passé et votre navigateur.
 
 ## Vérifier que tout marche
 
 Ajoutez `#test` à la fin de l'adresse (https://mathdys.github.io/#test) : MathDys lance un auto-test et affiche ce qui fonctionne.
+
+## Contribuer
+
+Toute aide est bienvenue : voir [CONTRIBUTING.md](CONTRIBUTING.md). Les tests automatiques se lancent à chaque envoi (onglet *Actions*).
 
 ## Licence
 

@@ -12,8 +12,11 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Andika&family=Atkinson+Hyperlegible:wght@400;700&family=Lexend:wght@400;600&display=swap" rel="stylesheet">
-<!-- Version de MathLive figée : une mise à jour de leur côté ne peut pas casser MathDys -->
-<script src="https://cdn.jsdelivr.net/npm/mathlive@0.104.2/dist/mathlive.min.js"></script>
+<!-- Éditeur de formules MathLive 0.104.2 (version figée).
+     1) copie locale dans lib/ si elle existe (aucun service extérieur, marche hors ligne dès la 1re visite)
+     2) sinon, la même version depuis jsDelivr -->
+<script src="lib/mathlive.min.js"></script>
+<script>if(!window.MathfieldElement && !(window.MathLive && window.MathLive.MathfieldElement)) document.write('<script src="https://cdn.jsdelivr.net/npm/mathlive@0.104.2/dist/mathlive.min.js"><\/script>');</script>
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -63,7 +66,8 @@
     <div><b>Une idée de fonctionnalité ? Un bug ?</b><br>
     Écris-moi à <a href="mailto:git.public@protonmail.com?subject=MathDys%20%E2%80%94%20">git.public@protonmail.com</a>
     <span class="contact-mail">(adresse à copier : git.public@protonmail.com)</span><br>
-    <span class="contact-tip">Pour un bug, dis ce que tu faisais, ce qui s’est passé et ton navigateur : ça m’aide beaucoup.</span></div>
+    <span class="contact-tip">Pour un bug, dis ce que tu faisais et ce qui s’est passé : ça m’aide beaucoup.</span><br>
+    <button class="btn" id="bugBtn" style="margin-top:.5em">🐞 Signaler un bug</button></div>
   </aside>
 </main>
 
@@ -99,24 +103,39 @@
   <div class="field"><label for="sCheck">Opérations posées : bouton « Vérifier »</label><input type="checkbox" id="sCheck"></div>
   <div class="field"><label for="sFocus">Mode concentration : estomper les autres lignes (F8)</label><input type="checkbox" id="sFocus"></div>
   <div class="field"><label for="sParens">Colorer les parenthèses par paire</label><input type="checkbox" id="sParens"></div>
+  <div class="field"><label for="sDigits">Colorer les chiffres (bleu) et les lettres (violet) dans les calculs</label><input type="checkbox" id="sDigits"></div>
   <div class="field"><label for="sTeacher">Mode professeur : marquer des lignes comme « énoncé » protégé (🔒)</label><input type="checkbox" id="sTeacher"></div>
   <div class="field"><label for="sSimple">Mode simple : n’afficher que les boutons essentiels</label><input type="checkbox" id="sSimple"></div>
   <div class="field"><label for="sVkb">Clavier de maths à l’écran (tablettes)</label>
     <select id="sVkb" class="btn"><option value="auto">Automatique (tablettes)</option><option value="on">Toujours proposer</option><option value="off">Jamais</option></select></div>
+  <div class="field" style="flex-wrap:wrap"><label for="sAbbr">Mes abréviations, une par ligne (ex. <code>ssi = si et seulement si</code>, <code>dv = dérivée</code>). Elles marchent dans le texte et dans les calculs.</label>
+    <textarea id="sAbbr" rows="3" style="width:100%;font:inherit;font-size:.9em;border:1px solid var(--line);border-radius:8px;padding:.4em;background:var(--soft);color:var(--ink)" placeholder="ssi = si et seulement si"></textarea></div>
   <div class="field"><label for="sRate">Vitesse de la lecture à voix haute</label><input type="range" id="sRate" min="0.5" max="1.5" step="0.05"></div>
   <div class="foot"><button class="btn primary" data-close>Fermer</button></div>
 </div></div>
 
 <!-- Recherche de symbole -->
 <div class="overlay" id="srchDlg"><div class="dialog" style="max-width:560px" role="dialog" aria-modal="true" aria-label="Chercher un symbole">
-  <input id="srchIn" class="srch" aria-label="Nom du symbole" placeholder="Cherche un symbole par son nom : infini, union, matrice, système…" autocomplete="off">
+  <input id="srchIn" class="srch" aria-label="Nom du symbole" placeholder="Cherche un symbole, une formule ou une page : infini, Pythagore, discriminant…" autocomplete="off">
   <div class="slist" id="srchList"></div>
   <div class="foot"><span style="flex:1;font-size:.7em;color:var(--muted)">↑ ↓ pour choisir · Entrée pour insérer · Échap pour fermer</span></div>
+</div></div>
+
+<!-- Signaler un bug -->
+<div class="overlay" id="bugDlg"><div class="dialog" style="max-width:600px" role="dialog" aria-modal="true" aria-label="Signaler un bug">
+  <h2>Signaler un bug ou proposer une idée</h2>
+  <label for="bugTxt" class="op-msg" style="display:block;margin-bottom:.3em">Que faisais-tu ? Que s’est-il passé ? Qu’attendais-tu ?</label>
+  <textarea id="bugTxt" rows="5" style="width:100%;font:inherit;font-size:.85em;border:1px solid var(--line);border-radius:8px;padding:.5em;background:var(--soft);color:var(--ink)"></textarea>
+  <p class="op-msg">Ajouté automatiquement : version de MathDys, navigateur, taille d’écran et réglages. <b>Ton cahier et ton nom ne sont pas envoyés.</b></p>
+  <pre id="bugInfo" style="font-size:.65em;background:var(--soft);border-radius:8px;padding:.5em;white-space:pre-wrap;max-height:8em;overflow:auto"></pre>
+  <div class="foot"><button class="btn" data-close>Fermer</button><button class="btn" id="bugCopy">Copier le message</button><a class="btn primary" id="bugMail" href="#">Écrire le mail</a></div>
+  <p class="op-msg" style="text-align:right">Si le mail ne s’ouvre pas : copie le message et envoie-le à <b>git.public@protonmail.com</b></p>
 </div></div>
 
 <!-- Confirmation -->
 <div class="overlay" id="askDlg"><div class="dialog" style="max-width:440px" role="alertdialog" aria-modal="true" aria-labelledby="askText">
   <h2 id="askText"></h2>
+  <input id="askIn" class="srch" style="display:none" list="askList" autocomplete="off"><datalist id="askList"></datalist>
   <div class="foot"><button class="btn" data-close>Annuler</button><button class="btn primary" id="askOk">Oui</button></div>
 </div></div>
 

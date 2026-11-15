@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MathDys — cahier de maths</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Andika&family=Atkinson+Hyperlegible:wght@400;700&family=Lexend:wght@400;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/mathlive/dist/mathlive.min.js"></script>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header>
+  <div class="bar">
+    <div class="brand">Math<span>Dys</span></div>
+    <select id="pageSel" class="btn" title="Changer de page"></select>
+    <input id="pageTitle" class="pageTitle" title="Nom de la page (clique pour renommer)">
+    <button class="btn" id="newPage" title="Nouvelle page">＋ Page</button>
+    <div class="grow"></div>
+    <span class="status" id="status"></span>
+    <select id="levelSel" class="btn" title="Niveau">
+      <option value="primaire">Primaire</option>
+      <option value="college">Collège</option>
+      <option value="lycee">Lycée</option>
+    </select>
+    <button class="btn" id="openBtn" title="Ouvrir un cahier enregistré sur ton ordinateur (Ctrl+O)">📂 Ouvrir</button>
+    <button class="btn" id="saveBtn" title="Enregistrer ce cahier sur ton ordinateur (Ctrl+S) — Ctrl+Maj+S pour « Enregistrer sous »">💾 Enregistrer</button>
+    <input type="file" id="fileIn" accept=".mathdys,.json,application/json" hidden>
+    <button class="btn" id="copyBtn" title="Copier toute la page (texte + LaTeX)">Copier</button>
+    <button class="btn" id="settingsBtn" title="Réglages d'affichage">Réglages</button>
+    <button class="btn primary" id="helpBtn" title="Raccourcis clavier (F1)">? Aide</button>
+  </div>
+  <div class="tools" id="tools"></div>
+  <div class="cats" id="cats"></div>
+  <div class="tools items" id="items"></div>
+</header>
+
+<div class="loaderr" id="loaderr">L'éditeur de formules n'a pas pu se charger (pas de connexion ?). Recharge la page une fois connecté.</div>
+
+<main>
+  <div class="paper" id="paper"></div>
+  <div class="hint">Entrée : nouvelle ligne · Ctrl+D : dupliquer la ligne · Ctrl+Entrée : calculer · Ctrl+K : chercher un symbole · Ctrl+S : enregistrer · F1 : toute l'aide</div>
+  <aside class="contact">
+    <div class="contact-ic">💬</div>
+    <div><b>Une idée de fonctionnalité ? Un bug ?</b><br>
+    Écris-moi à <a href="mailto:git.public@protonmail.com?subject=MathDys%20%E2%80%94%20">git.public@protonmail.com</a>
+    <span class="contact-mail">(adresse à copier : git.public@protonmail.com)</span><br>
+    <span class="contact-tip">Pour un bug, dis ce que tu faisais, ce qui s’est passé et ton navigateur : ça m’aide beaucoup.</span></div>
+  </aside>
+</main>
+
+<!-- Aide -->
+<div class="overlay" id="helpDlg"><div class="dialog">
+  <h2>Écrire vite, sans souris</h2>
+  <div id="helpBody"></div>
+  <div class="foot"><button class="btn primary" data-close>J'ai compris</button></div>
+</div></div>
+
+<!-- Réglages -->
+<div class="overlay" id="setDlg"><div class="dialog">
+  <h2>Réglages d'affichage</h2>
+  <div class="field"><label for="sFs">Taille du texte</label><input type="range" id="sFs" min="16" max="34" step="1"></div>
+  <div class="field"><label for="sLh">Espace entre les lignes</label><input type="range" id="sLh" min="1.2" max="2.4" step="0.1"></div>
+  <div class="field"><label for="sFont">Police</label>
+    <select id="sFont" class="btn">
+      <option value="'Lexend', Arial, sans-serif">Lexend</option>
+      <option value="'Atkinson Hyperlegible', Arial, sans-serif">Atkinson Hyperlegible</option>
+      <option value="'Andika', Arial, sans-serif">Andika</option>
+      <option value="Verdana, sans-serif">Verdana</option>
+      <option value="Arial, sans-serif">Arial</option>
+    </select></div>
+  <div class="field"><label for="sTheme">Couleurs</label>
+    <select id="sTheme" class="btn"><option value="clair">Clair</option><option value="creme">Crème (moins éblouissant)</option><option value="sombre">Sombre</option></select></div>
+  <div class="field"><label for="sAlign">Aligner les signes = d'une ligne à l'autre</label><input type="checkbox" id="sAlign"></div>
+  <div class="field"><label for="sLabels">Opérations posées : afficher u, d, c au-dessus des colonnes</label><input type="checkbox" id="sLabels"></div>
+  <div class="field"><label for="sCheck">Opérations posées : bouton « Vérifier »</label><input type="checkbox" id="sCheck"></div>
+  <div class="foot"><button class="btn primary" data-close>Fermer</button></div>
+</div></div>
+
+<!-- Recherche de symbole -->
+<div class="overlay" id="srchDlg"><div class="dialog" style="max-width:560px">
+  <input id="srchIn" class="srch" placeholder="Cherche un symbole par son nom : infini, union, matrice, système…" autocomplete="off">
+  <div class="slist" id="srchList"></div>
+  <div class="foot"><span style="flex:1;font-size:.7em;color:var(--muted)">↑ ↓ pour choisir · Entrée pour insérer · Échap pour fermer</span></div>
+</div></div>
+
+<!-- Confirmation -->
+<div class="overlay" id="askDlg"><div class="dialog" style="max-width:440px">
+  <h2 id="askText"></h2>
+  <div class="foot"><button class="btn" data-close>Annuler</button><button class="btn primary" id="askOk">Oui</button></div>
+</div></div>
+
+<div class="toast" id="toast"></div>
+<div class="drop" id="drop">Lâche le fichier pour ouvrir le cahier</div>
+
+<script src="app.js"></script>
+</body>
+</html>

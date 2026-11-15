@@ -1,0 +1,27 @@
+# Fichiers créés automatiquement par Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# Fichiers créés automatiquement par macOS
+.DS_Store
+._*
+
+# Fichiers créés automatiquement par Linux
+*~
+.directory
+
+# Réglages des éditeurs de code (VS Code, JetBrains…)
+.vscode/
+.idea/
+*.swp
+
+# Tes propres cahiers de test : ils restent sur ton PC
+*.mathdys
+
+# Fichiers temporaires et archives
+*.tmp
+*.log
+*.zip
+node_modules/

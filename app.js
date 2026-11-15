@@ -266,6 +266,14 @@ function makeRowEl(row){
   [['▲',-1,'Monter ce bloc (Alt+↑)'],['▼',1,'Descendre ce bloc (Alt+↓)']].forEach(([t,d,tt])=>{ const b=document.createElement('button'); b.textContent=t; b.title=tt; b.tabIndex=-1;
     b.addEventListener('mousedown',e=>e.preventDefault()); b.addEventListener('click',()=>moveRow(row.id,d)); mv.append(b); });
   el.append(g,body,mv,del);
+  if(row.type==='math'||row.type==='text'){
+    el.addEventListener('pointerup',e=>{
+      if(e.button!==0 || e.target.closest('button')) return;
+      setTimeout(()=>{ const mf=el.querySelector('math-field'), tx=el.querySelector('.txt');
+        if(mf){ if(document.activeElement!==mf || (mf.hasFocus&&!mf.hasFocus())) mfFocus(mf,'end'); }
+        else if(tx && document.activeElement!==tx && tx.isContentEditable) focusRow(row.id,'end'); },0);
+    });
+  }
   if(row.locked){ el.classList.add('locked'); const bd=document.createElement('span'); bd.className='lockbadge'; bd.textContent='Énoncé'; body.append(bd); }
   if(row.type==='math') buildMath(row,body);
   else if(row.type==='text') buildText(row,body);
@@ -292,6 +300,14 @@ function buildMath(row,body){
   mf._setup=()=>setupMF(mf, row.value||'', '\\text{calcul…}');
 }
 // configuration d'un champ de formule une fois dans la page
+// placer le curseur dans une formule : mf.focus() ne suffit pas toujours, on passe alors par la zone de saisie interne de MathLive
+function mfFocus(mf,where){
+  if(!mf) return;
+  try{ mf.focus(); }catch(e){}
+  const ok=()=>document.activeElement===mf && (!mf.hasFocus || mf.hasFocus());
+  if(!ok()){ const sink=mf.shadowRoot && mf.shadowRoot.querySelector('[part="keyboard-sink"], .ML__keyboard-sink'); if(sink) try{ sink.focus(); }catch(e){} }
+  if(where) requestAnimationFrame(()=>{ try{ mf.executeCommand(where==='start'?'moveToMathfieldStart':'moveToMathfieldEnd'); }catch(e){} });
+}
 function vkbOn(){ const v=state.settings.vkb||'auto'; if(v==='on') return true; if(v==='off') return false;
   try{ return matchMedia('(pointer: coarse)').matches && !matchMedia('(pointer: fine)').matches; }catch(e){ return false; } }
 function setupMF(mf,value,ph){
@@ -598,7 +614,7 @@ function buildGraph(row,body){
   function relabel(){ [...list.children].forEach((ln,i)=>{ ln.querySelector('.gdot').style.background=GCOL[i%GCOL.length]; ln.querySelector('.gname').textContent=GNAMES[i%GNAMES.length]+'(x) ='; }); }
   function removeField(k){ if(fields.length<=1){ fields[0].value=''; V.fns[0]=''; draw(); scheduleSave(); return; }
     list.children[k].remove(); fields.splice(k,1); V.fns.splice(k,1); relabel(); draw(); scheduleSave(); focusMF(fields[Math.max(0,k-1)]); }
-  function focusMF(mf){ mf.focus(); requestAnimationFrame(()=>{ try{ mf.executeCommand('moveToMathfieldEnd'); }catch(e){} }); }
+  function focusMF(mf){ mfFocus(mf,'end'); }
   V.fns.forEach((_,i)=>addField(i,false));
   // API utilisée par le clavier (Entrée / Retour arrière)
   box._addAfter=mf=>{ const k=fields.indexOf(mf)+1; if(fields.length>=GNAMES.length){ toast('6 fonctions maximum'); return; } V.fns.splice(k,0,''); addField(k,true); relabel(); scheduleSave(); };
@@ -1009,7 +1025,7 @@ function renderPageList(){
 function focusRow(id,where){
   if(!id) return; const el=els.get(id); if(!el) return;
   const mf=el.querySelector('math-field');
-  if(mf){ mf.focus(); requestAnimationFrame(()=>{ try{ mf.executeCommand(where==='start'?'moveToMathfieldStart':'moveToMathfieldEnd'); }catch(e){} }); }
+  if(mf){ mfFocus(mf,where==='start'?'start':'end'); }
   else if(el.querySelector('.txt')){ const t=el.querySelector('.txt'); t.focus(); const r=document.createRange(); r.selectNodeContents(t); r.collapse(where==='start'); const s=getSelection(); s.removeAllRanges(); s.addRange(r); }
   else { const body=el.querySelector('.body')||el; let i=null;
     for(const sel of ['.op-expr','.tab-grid input.tx','.tlev input','.tstage .tp','.imgblk','.body button']){ i=body.querySelector(sel); if(i) break; }
@@ -1069,7 +1085,7 @@ function moveRow(id,dir){
   const el=els.get(id), other=els.get(R[i].id);
   if(dir<0) paper.insertBefore(el,other); else paper.insertBefore(other,el);
   el.scrollIntoView({block:'nearest'}); scheduleSave(); scheduleAlign();
-  const mf=el.querySelector('math-field'); if(mf) requestAnimationFrame(()=>{ mf.focus(); });
+  const mf=el.querySelector('math-field'); if(mf) requestAnimationFrame(()=>mfFocus(mf));
 }
 function toggleType(id){
   const r=rowById(id); if(!r||(r.type!=='math'&&r.type!=='text')) return;
@@ -1458,7 +1474,7 @@ function insertTpl(tpl){
   if(tpl==='@img'){ const r=addRowAfter(currentId,'img'); pickImageFor(r.id); return; }
   if(tpl[0]==='@'){ addRowAfter(currentId,tpl.slice(1)); return; }
   const mf=targetMF(); if(!mf) return;
-  mf.focus();
+  mfFocus(mf);
   try{ mf.insert(tpl,{focus:true, selectionMode:'placeholder', format:'latex'}); }catch(e){ try{ mf.executeCommand(['insert',tpl]); }catch(_){} }
   mf.dispatchEvent(new Event('input',{bubbles:true}));
 }
@@ -1823,7 +1839,7 @@ function toast(t,actLabel,actFn){
 }
 
 /* ============ Hors ligne : installation comme une application ============ */
-const APP_VERSION='0.4.1';
+const APP_VERSION='0.4.2';
 try{
   if('serviceWorker' in navigator && location.protocol==='https:' && window.self===window.top)
     navigator.serviceWorker.register('sw.js').catch(()=>{});

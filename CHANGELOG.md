@@ -1,5 +1,10 @@
 # Nouveautés de MathDys
 
+## Version 0.4.2
+- Nouvelle adresse : **https://mathdys.github.io**
+- Cliquer n'importe où sur une ligne (même à droite de la formule ou sur une ligne vide) y place le curseur.
+- Le curseur passe de façon fiable d'une ligne à l'autre (flèches, Échap, déplacement de blocs).
+
 ## Version 0.4.1 (corrections après tests en ligne)
 - La calculatrice, la lecture à voix haute et l'export comprennent les fractions et racines tapées au clavier (\frac34, \sqrt2).
 - Échap pour fermer une fenêtre ne fait plus passer la ligne de calcul en « mode LaTeX ».

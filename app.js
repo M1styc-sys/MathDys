@@ -519,6 +519,11 @@ function cellInput(row,kind,place){
   i.addEventListener('focus',()=>i.select());
   return i;
 }
+// première case à remplir : unités du résultat (+ −), premier produit partiel (×), début de la potence (÷)
+function opStart(rowEl){ const g=rowEl.querySelector('.op-grid'); if(!g) return false;
+  const ps=opPlaces(g); let t= ps.length ? opCell(g,'res',ps[ps.length-1]) : null;
+  t = t || g.querySelector('input[data-key="p0:0"]') || g.querySelector('input[data-key="r:0"]') || g.querySelector('input[data-key="w1:1"]');
+  if(t){ t.focus(); return true; } return false; }
 function opCell(grid,kind,place){ return grid.querySelector('input[data-kind="'+kind+'"][data-place="'+place+'"]'); }
 function opPlaces(grid){ return [...grid.querySelectorAll('input[data-kind="res"]')].map(i=>+i.dataset.place); } // gauche → droite
 function opKey(e,row,i){
@@ -636,9 +641,9 @@ function buildGraph(row,body){
     c.strokeStyle=ink; c.lineWidth=1.5; c.beginPath(); c.moveTo(0,ax); c.lineTo(W,ax); c.moveTo(ay,0); c.lineTo(ay,H); c.stroke();
     c.fillStyle=muted; c.font='12px '+(cs.getPropertyValue('--font')||'sans-serif');
     c.textAlign='center'; c.textBaseline='top';
-    for(let x=Math.ceil(v.xmin/sx)*sx;x<=v.xmax;x+=sx){ if(Math.abs(x)<sx/2) continue; c.fillText(frNum(x),X(x),Math.min(ax+4,H-16)); }
+    for(let x=Math.ceil(v.xmin/sx)*sx;x<=v.xmax;x+=sx){ if(Math.abs(x)<sx/2||X(x)<14||X(x)>W-14) continue; c.fillText(frNum(x),X(x),Math.min(ax+4,H-16)); }
     c.textAlign='right'; c.textBaseline='middle';
-    for(let y=Math.ceil(v.ymin/sy)*sy;y<=v.ymax;y+=sy){ if(Math.abs(y)<sy/2) continue; c.fillText(frNum(y),Math.max(ay-5,30),Y(y)); }
+    for(let y=Math.ceil(v.ymin/sy)*sy;y<=v.ymax;y+=sy){ if(Math.abs(y)<sy/2||Y(y)<10||Y(y)>H-10) continue; c.fillText(frNum(y),Math.max(ay-5,30),Y(y)); }
     c.textAlign='right'; c.textBaseline='top'; c.fillText('0',ay-4,ax+4);
     // courbes
     const bad=[];
@@ -719,7 +724,7 @@ function buildTree(row,body){
     stage.innerHTML=''; probInputs=[]; labels=[]; prods=[];
     const fs=state.settings.fs; const counts=V.levels.map(l=>l.length); const nL=counts.length;
     const leaves=counts.reduce((a,b)=>a*b,1);
-    const rowH=Math.round(fs*2.1), colW=Math.round(fs*8.5), nodeW=Math.round(fs*2.2);
+    const rowH=Math.round(fs*2.7), colW=Math.round(fs*9), nodeW=Math.round(fs*2.2);
     const W=24+nL*colW+nodeW+(V.prod!==false?fs*16:20), H=leaves*rowH+8;
     stage.style.width=W+'px'; stage.style.height=H+'px';
     const NS='http://www.w3.org/2000/svg'; const svg=document.createElementNS(NS,'svg'); svg.setAttribute('width',W); svg.setAttribute('height',H); stage.append(svg);
@@ -1006,7 +1011,9 @@ function focusRow(id,where){
   const mf=el.querySelector('math-field');
   if(mf){ mf.focus(); requestAnimationFrame(()=>{ try{ mf.executeCommand(where==='start'?'moveToMathfieldStart':'moveToMathfieldEnd'); }catch(e){} }); }
   else if(el.querySelector('.txt')){ const t=el.querySelector('.txt'); t.focus(); const r=document.createRange(); r.selectNodeContents(t); r.collapse(where==='start'); const s=getSelection(); s.removeAllRanges(); s.addRange(r); }
-  else { const i=el.querySelector('.op-expr, .tab-x input, input[type=text], .imgblk, button'); if(i) i.focus(); }
+  else { const body=el.querySelector('.body')||el; let i=null;
+    for(const sel of ['.op-expr','.tab-grid input.tx','.tlev input','.tstage .tp','.imgblk','.body button']){ i=body.querySelector(sel); if(i) break; }
+    if(i) i.focus(); }
   setCurrent(id);
   el.scrollIntoView({block:'nearest'});
 }
@@ -1078,9 +1085,30 @@ function isEmpty(r){ return r.type==='op' ? !(r.value&&r.value.expr) : (r.type==
 
 /* ---------- Calculatrice intégrée (Ctrl+Entrée) ---------- */
 function splitTopEq(s){ const out=[]; let d=0,cur=''; for(const ch of s){ if(ch==='{')d++; if(ch==='}')d--; if(ch==='='&&d===0){out.push(cur);cur='';} else cur+=ch; } out.push(cur); return out; }
+/* MathLive écrit parfois \frac34 ou \sqrt2 sans accolades : on les remet, pour que tout le reste comprenne */
+const ARGS={frac:2,dfrac:2,tfrac:2,binom:2,sqrt:1,overline:1,overrightarrow:1,widehat:1,mathbb:1,text:1,operatorname:1};
+function braceify(src){
+  let s=src||'', out='', i=0;
+  const readArg=()=>{ while(s[i]===' ') i++;
+    if(s[i]==='{'){ let d=0, j=i; do{ if(s[j]==='{') d++; else if(s[j]==='}') d--; j++; }while(d>0&&j<s.length); const a=s.slice(i,j); i=j; return '{'+braceify(a.slice(1,-1))+'}'; }
+    if(s[i]==='\\'){ let j=i+1; while(j<s.length&&/[a-zA-Z]/.test(s[j])) j++; if(j===i+1) j++; const a=s.slice(i,j); i=j; return '{'+a+'}'; }
+    if(i<s.length){ const a=s[i]; i++; return '{'+a+'}'; } return '{}'; };
+  while(i<s.length){
+    const c=s[i];
+    if(c==='\\'){ let j=i+1; while(j<s.length&&/[a-zA-Z]/.test(s[j])) j++; const name=s.slice(i+1,j);
+      if(ARGS[name]){ out+='\\'+name; i=j;
+        if(name==='sqrt'){ while(s[i]===' ') i++; if(s[i]==='['){ const k=s.indexOf(']',i); out+=s.slice(i,k+1); i=k+1; } }
+        for(let n=0;n<ARGS[name];n++) out+=readArg(); continue; }
+      if(j===i+1){ out+=s.slice(i,i+2); i+=2; continue; }
+      out+=s.slice(i,j); i=j; continue; }
+    if(c==='^'||c==='_'){ i++; out+=c+readArg(); continue; }
+    out+=c; i++;
+  }
+  return out;
+}
 /* LaTeX → expression simple, puis petit analyseur (sans eval). Sert à la calculatrice et aux graphiques. */
 function normLatex(s){
-  let t=s.replace(/\\m?left|\\m?right/g,'').replace(/\{,\}/g,'.').replace(/(\d),(\d)/g,'$1.$2');
+  let t=braceify(s).replace(/\\m?left|\\m?right/g,'').replace(/\{,\}/g,'.').replace(/(\d),(\d)/g,'$1.$2');
   t=t.replace(/\\times|\\cdot/g,'*').replace(/\\div/g,'/').replace(/\\pi/g,' pi ').replace(/\\%|%/g,'/100');
   t=t.replace(/\\exponentialE/g,'e').replace(/\\operatorname\{([a-z]+)\}/g,' $1 ');
   t=t.replace(/\\(sin|cos|tan|ln|log|exp)\b/g,' $1 ');
@@ -1196,7 +1224,7 @@ window.addEventListener('resize',scheduleAlign);
 
 /* ============ Lecture à voix haute (synthèse vocale du navigateur, rien n'est envoyé) ============ */
 function latexToSpeech(src){
-  let t=' '+(src||'')+' ';
+  let t=' '+braceify(src||'')+' ';
   t=t.replace(/\\[,;:!]/g,' ').replace(/\\(begin|end)\{(\w+)\}/g,'\\$1$2 ').replace(/\\(mathbb|operatorname)\{([^{}]*)\}/g,' $2 ');
   // lettres collées (xy) : on les sépare pour qu'elles soient lues une par une, sans toucher aux commandes (\frac…) ni au texte
   t=t.split(/(\\text\{[^{}]*\})/).map(seg=>/^\\text\{/.test(seg)?' '+seg.slice(6,-1)+' ':seg.replace(/(^|[^\\a-zA-Z])([a-zA-Z]{2,})/g,(m,p,w)=>p+w.split('').join(' '))).join('');
@@ -1209,7 +1237,7 @@ function latexToSpeech(src){
   for(let n=0;n<40;n++){ const b=t;
     t=t.replace(/\\[dt]?frac\{([^{}]*)\}\{([^{}]*)\}/g,(m,a,c)=>{ const cx=x=>/[+\-=]|\s\S+\s\S/.test(x.trim()); return (cx(a)||cx(c)) ? ' fraction : '+a+' , sur , '+c+' , fin de fraction, ' : ' '+a+' sur '+c+' '; });
     t=t.replace(/\\binom\{([^{}]*)\}\{([^{}]*)\}/g,' $2 parmi $1 ');
-    t=t.replace(/\\sqrt\[([^{}\]]*)\]\{([^{}]*)\}/g,' racine $1-ième de $2 ');
+    t=t.replace(/\\sqrt\[([^{}\]]*)\]\{([^{}]*)\}/g,(m,n,a)=>' racine '+({'3':'cubique','4':'quatrième'}[n.trim()]||'d’indice '+n)+' de '+a+' ');
     t=t.replace(/\\sqrt\{([^{}]*)\}/g,' racine de $1 ');
     t=t.replace(/\\overrightarrow\{([^{}]*)\}/g,' vecteur $1 ');
     t=t.replace(/\\overline\{([^{}]*)\}/g,' $1 barre ');
@@ -1219,8 +1247,7 @@ function latexToSpeech(src){
     t=t.replace(/\^\{2\}|\^2(?!\d)/g,' au carré ').replace(/\^\{3\}|\^3(?!\d)/g,' au cube ');
     t=t.replace(/\^\{([^{}]*)\}/g,' puissance $1 ').replace(/\^(\w)/g,' puissance $1 ');
     t=t.replace(/_\{([^{}]*)\}/g,' indice $1 ').replace(/_(\w)/g,' indice $1 ');
-    t=t.replace(/\{([^{}]*)\}/g,' $1 ');
-    if(t===b) break; }
+    if(t===b){ t=t.replace(/(^|[^a-zA-Z\]\}\^_])\{([^{}]*)\}/g,'$1 $2 '); if(t===b) break; } }
   const W=[['\\times',' fois '],['\\cdot',' fois '],['\\div',' divisé par '],['\\le',' inférieur ou égal à '],['\\ge',' supérieur ou égal à '],
     ['\\ne',' différent de '],['\\approx',' environ égal à '],['\\pm',' plus ou moins '],['\\pi',' pi '],['\\infty',' l’infini '],
     ['\\notin',' n’appartient pas à '],['\\in',' appartient à '],['\\subset',' inclus dans '],['\\cap',' inter '],['\\cup',' union '],['\\varnothing',' l’ensemble vide '],
@@ -1292,7 +1319,7 @@ window.addEventListener('keydown',e=>{
   if(e.key==='F1'){ e.preventDefault(); openDlg('helpDlg'); return; }
   if(e.key==='F2'){ e.preventDefault(); if(e.shiftKey) speakPage(); else speakCurrent(); return; }
   if(e.key==='F8'){ e.preventDefault(); toggleFocus(); return; }
-  if(e.key==='Escape'){ const o=document.querySelectorAll('.overlay.open'); if(o.length){ o.forEach(x=>x.classList.remove('open')); if(currentId) focusRow(currentId,'end'); } return; }
+  if(e.key==='Escape'){ const o=document.querySelectorAll('.overlay.open'); if(o.length){ e.preventDefault(); e.stopPropagation(); o.forEach(x=>x.classList.remove('open')); if(currentId) focusRow(currentId,'end'); } return; }
   if(document.querySelector('.overlay.open')) return;
   const ctrl=e.ctrlKey||e.metaKey; const k=e.key.toLowerCase();
   const stop=()=>{ e.preventDefault(); e.stopPropagation(); };
@@ -1306,8 +1333,10 @@ window.addEventListener('keydown',e=>{
   if(ctrl && !e.altKey && k==='s'){ stop(); saveFile(e.shiftKey); return; }
   if(ctrl && !e.shiftKey && !e.altKey && k==='o'){ stop(); openFile(); return; }
   if(ctrl && !e.shiftKey && !e.altKey && k==='p'){ stop(); doPrint(); return; }
-  const t=e.target; const rowEl=t&&t.closest?t.closest('.row'):null;
-  if(!rowEl) return;
+  const t=e.target; let rowEl=t&&t.closest?t.closest('.row'):null;
+  if(!rowEl){ // curseur hors du cahier (bouton, lien…) : les raccourcis d'ajout s'appliquent à la ligne en cours
+    const global=ctrl&&(['g','b','d'].includes(k)||(e.key==='Enter'&&e.shiftKey));
+    if(global && currentId && els.get(currentId)) rowEl=els.get(currentId); else return; }
   const id=rowEl.dataset.id; const row=rowById(id); if(!row) return;
   if(ctrl && e.shiftKey && e.key==='Backspace'){ stop(); deleteRow(id); return; }
   if(e.altKey && !ctrl && (e.key==='ArrowUp'||e.key==='ArrowDown')){ stop(); moveRow(id,e.key==='ArrowUp'?-1:1); return; }
@@ -1344,7 +1373,7 @@ window.addEventListener('keydown',e=>{
   if(ctrl && e.shiftKey && e.key==='Enter'){ stop(); addRowAfter(id,'op'); return; }
   if(ctrl && e.key==='Enter'){ stop(); if(row.type==='math') compute(id); return; }
   if(e.key==='Enter' && !e.altKey){
-    if(row.type==='op' && t.classList.contains('op-expr')){ stop(); const g=rowEl.querySelector('.op-grid'); const ps=opPlaces(g); if(ps.length){ opCell(g,'res',ps[ps.length-1]).focus(); } return; }
+    if(row.type==='op' && t.classList.contains('op-expr')){ stop(); opStart(rowEl); return; }
     stop();
     let type = (row.type==='math'||row.type==='text') ? row.type : 'math';
     if(e.shiftKey) type = type==='math'?'text':'math';
@@ -1358,7 +1387,7 @@ window.addEventListener('keydown',e=>{
   }
   if(row.type==='op' && t.classList.contains('op-expr') && (e.key==='ArrowUp'||e.key==='ArrowDown')){
     const tgt = e.key==='ArrowUp'?prevId(id):(()=>{ const g=rowEl.querySelector('.op-grid'); const ps=opPlaces(g); return ps.length?null:nextId(id); })();
-    if(e.key==='ArrowDown'){ const g=rowEl.querySelector('.op-grid'); const ps=opPlaces(g); if(ps.length){ stop(); opCell(g,'res',ps[ps.length-1]).focus(); return; } }
+    if(e.key==='ArrowDown'){ if(opStart(rowEl)){ stop(); return; } }
     if(tgt){ stop(); focusRow(tgt,'end'); } return;
   }
 },true);
@@ -1440,7 +1469,7 @@ let srchSel=0, srchRes=[], srchMF=null;
 function openSearch(){
   srchMF = (lastMF && document.body.contains(lastMF)) ? lastMF : null;
   const inp=document.getElementById('srchIn'); inp.value=''; doSearch();
-  openDlg('srchDlg'); setTimeout(()=>inp.focus(),30);
+  openDlg('srchDlg'); inp.focus();
 }
 function doSearch(){
   const q=deacc(document.getElementById('srchIn').value.trim());
@@ -1569,7 +1598,10 @@ function renderHelp(){
 }
 
 /* ============ Fenêtres, réglages, pages ============ */
-function openDlg(id){ if(id==='helpDlg') renderHelp(); document.getElementById(id).classList.add('open'); }
+function openDlg(id){ if(id==='helpDlg') renderHelp(); const o=document.getElementById(id); o.classList.add('open');
+  // le curseur va dans la fenêtre : ce qu'on tape ne part plus dans le cahier derrière
+  if(document.activeElement && document.activeElement.blur) document.activeElement.blur();
+  const f=o.querySelector('input:not([type=hidden]),select,button.primary,button'); if(f) f.focus(); }
 document.querySelectorAll('.overlay').forEach(o=>{
   o.addEventListener('click',e=>{ if(e.target===o||e.target.hasAttribute('data-close')){ o.classList.remove('open'); if(o.id==='helpDlg'&&!state.seenHelp){state.seenHelp=true;scheduleSave(false);} if(currentId) focusRow(currentId,'end'); } });
 });
@@ -1624,15 +1656,15 @@ const SUP={'0':'⁰','1':'¹','2':'²','3':'³','4':'⁴','5':'⁵','6':'⁶','7
 const SUB={'0':'₀','1':'₁','2':'₂','3':'₃','4':'₄','5':'₅','6':'₆','7':'₇','8':'₈','9':'₉','+':'₊','-':'₋','n':'ₙ','k':'ₖ','p':'ₚ','i':'ᵢ'};
 const conv=(s,map,pre)=>[...s].every(c=>map[c])?[...s].map(c=>map[c]).join(''):pre+'('+s+')';
 function latexToUnicode(src){
-  let t=src||'';
+  let t=braceify(src||'');
   t=t.replace(/\\m?left|\\m?right/g,'').replace(/\{,\}/g,',').replace(/\\text\{([^{}]*)\}/g,'$1').replace(/\\[,;:! ]/g,' ');
   t=t.replace(/\\begin\{cases\}/g,'⦃ ').replace(/\\end\{cases\}/g,' ⦄').replace(/\\begin\{pmatrix\}/g,'[ ').replace(/\\end\{pmatrix\}/g,' ]').replace(/\\\\/g,' ; ').replace(/&/g,'  ');
   t=t.replace(/\\lim_\{([^{}]*)\\to([^{}]*)\}/g,'lim($1→$2) ');
-  const simple=x=>/^[\w.,]+$|^\\?[a-zA-Z]$/.test(x.trim());
+  const simple=x=>/^[\w.,]+$|^\\?[a-zA-Z]+$/.test(x.trim());
   for(let n=0;n<40;n++){ const b=t;
     t=t.replace(/\\[dt]?frac\{([^{}]*)\}\{([^{}]*)\}/g,(m,a,c)=>(simple(a)?a:'('+a+')')+'/'+(simple(c)?c:'('+c+')'));
     t=t.replace(/\\binom\{([^{}]*)\}\{([^{}]*)\}/g,'($1 parmi $2)'.replace('$1 parmi $2','$2 parmi $1'));
-    t=t.replace(/\\sqrt\[([^{}\]]*)\]\{([^{}]*)\}/g,'$1√($2)');
+    t=t.replace(/\\sqrt\[([^{}\]]*)\]\{([^{}]*)\}/g,(m,n,a)=>({'3':'∛','4':'∜'}[n.trim()]||n+'√')+(simple(a)?a:'('+a+')'));
     t=t.replace(/\\sqrt\{([^{}]*)\}/g,(m,a)=>'√'+(simple(a)?a:'('+a+')'));
     t=t.replace(/\\overrightarrow\{([^{}]*)\}/g,(m,a)=>'vect('+a+')');
     t=t.replace(/\\overline\{([^{}]*)\}/g,(m,a)=>[...a].map(c=>c+'̅').join(''));
@@ -1791,7 +1823,7 @@ function toast(t,actLabel,actFn){
 }
 
 /* ============ Hors ligne : installation comme une application ============ */
-const APP_VERSION='0.4.0';
+const APP_VERSION='0.4.1';
 try{
   if('serviceWorker' in navigator && location.protocol==='https:' && window.self===window.top)
     navigator.serviceWorker.register('sw.js').catch(()=>{});
@@ -1809,6 +1841,8 @@ function runSelfTest(){
   near('calcul −2²',evalLatex('-2^{2}'),-4);
   near('calcul 5!',evalLatex('5!'),120);
   near('calcul 2,5×4',evalLatex('2{,}5\\times4'),10);
+  near('fraction tapée au clavier (\\frac34)',evalLatex('\\frac34+\\frac14'),1);
+  near('racine tapée au clavier (\\sqrt2)',evalLatex('\\sqrt2\\times\\sqrt2'),2);
   eq('calcul refuse les lettres',evalLatex('x+1'),null);
   eq('fraction exacte ⅓+⅙',formatResult(0.5,'\\frac{1}{3}+\\frac{1}{6}').tex,'\\frac{1}{2}=0{,}5');
   // courbes

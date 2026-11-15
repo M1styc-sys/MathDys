@@ -1,5 +1,13 @@
 # Nouveautés de MathDys
 
+## Version 0.4.1 (corrections après tests en ligne)
+- La calculatrice, la lecture à voix haute et l'export comprennent les fractions et racines tapées au clavier (\frac34, \sqrt2).
+- Échap pour fermer une fenêtre ne fait plus passer la ligne de calcul en « mode LaTeX ».
+- Le curseur va bien dans un nouveau bloc (opération posée, tableau, arbre, image).
+- Entrée dans une multiplication ou une division posée amène dans la grille.
+- La recherche Ctrl+K prend le curseur tout de suite.
+- Barre du haut plus compacte sur les petits écrans, tableau sans barre de défilement, chiffres non barrés dans les opérations, arbre plus aéré.
+
 ## Version 0.4.0
 - **Annuler / Rétablir pour tout le cahier** (Ctrl+Z, Ctrl+Y, boutons ↶ ↷) : un bloc supprimé, déplacé ou transformé se récupère.
 - **Mode simple** : seulement les boutons essentiels ; tout le reste est dans Ctrl+K. Activé par les réglages tout prêts.

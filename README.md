@@ -1,4 +1,4 @@
-# MathDys — cahier de maths pour les élèves multi-dys
+# MathDys - cahier de maths pour les élèves multi-dys
 
 MathDys est un cahier de mathématiques en ligne pour prendre des notes **vite, au clavier, sans souris**.
 Il est pensé pour les élèves dyspraxiques, dyslexiques et dyscalculiques, de la primaire au lycée.

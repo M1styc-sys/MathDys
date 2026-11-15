@@ -51,6 +51,6 @@ Pour un bug, indiquez ce que vous faisiez, ce qui s'est passé et votre navigate
 Une simple page web : `index.html`, `style.css` et `app.js`, plus `sw.js` et `manifest.webmanifest` pour le mode hors ligne. Pas d'installation, pas de serveur.
 L'éditeur de formules est [MathLive](https://cortexjs.io/mathlive/) (licence MIT).
 
-##Licence
+## Licence
 
 MathDys est un logiciel libre distribué sous licence GNU GPL v3 (voir le fichier LICENSE). Vous pouvez l'utiliser, l'étudier, le modifier et le partager librement. Si vous distribuez une version modifiée, elle doit rester libre, sous la même licence, avec son code source.

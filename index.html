@@ -4,6 +4,11 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>MathDys — cahier de maths</title>
+<meta name="description" content="Cahier de maths au clavier pour les élèves multi-dys. Aucun compte, tout reste sur ton ordinateur.">
+<meta name="theme-color" content="#2f6fde">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Andika&family=Atkinson+Hyperlegible:wght@400;700&family=Lexend:wght@400;600&display=swap" rel="stylesheet">
@@ -27,6 +32,8 @@
     <button class="btn" id="openBtn" title="Ouvrir un cahier enregistré sur ton ordinateur (Ctrl+O)">📂 Ouvrir</button>
     <button class="btn" id="saveBtn" title="Enregistrer ce cahier sur ton ordinateur (Ctrl+S) — Ctrl+Maj+S pour « Enregistrer sous »">💾 Enregistrer</button>
     <input type="file" id="fileIn" accept=".mathdys,.json,application/json" hidden>
+    <input type="file" id="imgIn" accept="image/*" hidden>
+    <button class="btn" id="printBtn" title="Imprimer ou enregistrer en PDF (Ctrl+P)">🖨 Imprimer / PDF</button>
     <button class="btn" id="copyBtn" title="Copier toute la page (texte + LaTeX)">Copier</button>
     <button class="btn" id="settingsBtn" title="Réglages d'affichage">Réglages</button>
     <button class="btn primary" id="helpBtn" title="Raccourcis clavier (F1)">? Aide</button>
@@ -36,6 +43,7 @@
   <div class="tools items" id="items"></div>
 </header>
 
+<div class="printhead" id="printhead"></div>
 <div class="loaderr" id="loaderr">L'éditeur de formules n'a pas pu se charger (pas de connexion ?). Recharge la page une fois connecté.</div>
 
 <main>
@@ -60,6 +68,10 @@
 <!-- Réglages -->
 <div class="overlay" id="setDlg"><div class="dialog">
   <h2>Réglages d'affichage</h2>
+  <div class="presets"><span>Réglages tout prêts :</span>
+    <button class="btn" data-preset="dyspraxie">Dyspraxie</button><button class="btn" data-preset="dyslexie">Dyslexie</button>
+    <button class="btn" data-preset="dyscalculie">Dyscalculie</button><button class="btn" data-preset="defaut">Par défaut</button></div>
+  <p class="op-msg" style="margin:.2em 0 .6em">Un point de départ : ajuste ensuite chaque réglage, si possible avec ton ou ta ergothérapeute.</p>
   <div class="field"><label for="sFs">Taille du texte</label><input type="range" id="sFs" min="16" max="34" step="1"></div>
   <div class="field"><label for="sLh">Espace entre les lignes</label><input type="range" id="sLh" min="1.2" max="2.4" step="0.1"></div>
   <div class="field"><label for="sFont">Police</label>
@@ -72,9 +84,13 @@
     </select></div>
   <div class="field"><label for="sTheme">Couleurs</label>
     <select id="sTheme" class="btn"><option value="clair">Clair</option><option value="creme">Crème (moins éblouissant)</option><option value="sombre">Sombre</option></select></div>
+  <div class="field"><label for="sName">Ton nom (écrit en haut de la copie imprimée)</label><input type="text" id="sName" class="btn" style="width:12em;text-align:left" placeholder="Prénom Nom"></div>
   <div class="field"><label for="sAlign">Aligner les signes = d'une ligne à l'autre</label><input type="checkbox" id="sAlign"></div>
   <div class="field"><label for="sLabels">Opérations posées : afficher u, d, c au-dessus des colonnes</label><input type="checkbox" id="sLabels"></div>
   <div class="field"><label for="sCheck">Opérations posées : bouton « Vérifier »</label><input type="checkbox" id="sCheck"></div>
+  <div class="field"><label for="sFocus">Mode concentration : estomper les autres lignes (F8)</label><input type="checkbox" id="sFocus"></div>
+  <div class="field"><label for="sParens">Colorer les parenthèses par paire</label><input type="checkbox" id="sParens"></div>
+  <div class="field"><label for="sRate">Vitesse de la lecture à voix haute</label><input type="range" id="sRate" min="0.5" max="1.5" step="0.05"></div>
   <div class="foot"><button class="btn primary" data-close>Fermer</button></div>
 </div></div>
 

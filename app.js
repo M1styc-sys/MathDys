@@ -102,6 +102,8 @@ const CATALOG=[
  ]},
  {cat:'Probas', items:[
   ['🌳','Arbre de probabilités','@tree',null,1,'arbre pondéré branches'],
+  ['+−','Opération posée','@op',null,0,'addition soustraction multiplication division poser'],
+  ['🖼','Image de l\u2019énoncé','@img',null,0,'photo capture énoncé'],
   ['P(A)','Probabilité de A','P\\left(#?\\right)',null,1,''],
   ['Ā','Contraire (barre)','\\overline{#?}','barre',1,'complémentaire événement'],
   ['∩','Intersection (et)','\\cap','inter',1,'et'],
@@ -163,7 +165,7 @@ function defaults(){
     {id:uid(),type:'text',value:'Astuce : place-toi sur une ligne et fais Ctrl+D pour la recopier, puis corrige seulement ce qui change.'},
     {id:uid(),type:'math',value:''}
   ];
-  return {pages:[p], current:p.id, settings:{level:'college', fs:20, lh:1.6, font:"'Lexend', Arial, sans-serif", theme:'clair', align:true, labels:true, check:true, focus:false, parens:false, rate:1, name:''}, seenHelp:false};
+  return {pages:[p], current:p.id, settings:{level:'college', fs:20, lh:1.6, font:"'Lexend', Arial, sans-serif", theme:'clair', align:true, labels:true, check:true, focus:false, parens:false, rate:1, name:'', simple:false, vkb:'auto', teacher:false}, seenHelp:false};
 }
 let canStore=true;
 function load(){
@@ -174,7 +176,7 @@ function load(){
 let state = load() || defaults();
 state.settings = Object.assign(defaults().settings, state.settings||{});
 let saveTimer=null;
-function scheduleSave(dirty){ if(dirty!==false){ const p=page(); if(p) p.dirty=true; } clearTimeout(saveTimer); saveTimer=setTimeout(save,400); refreshFileStatus(); }
+function scheduleSave(dirty){ if(dirty!==false){ const p=page(); if(p) p.dirty=true; noteChange(); } clearTimeout(saveTimer); saveTimer=setTimeout(save,400); refreshFileStatus(); }
 function save(){
   try{ localStorage.setItem(KEY, JSON.stringify(state)); canStore=true; }
   catch(e){ if(canStore) toast('Mémoire du navigateur pleine : enregistre ton cahier dans un fichier (Ctrl+S)'); canStore=false; }
@@ -200,6 +202,37 @@ const BLOCKS={
   op:{icon:'+−',label:'Opération posée',f:''}, graph:{icon:'📈',label:'Graphique',f:''},
   tree:{icon:'P',label:'Arbre',f:''}, img:{icon:'🖼',label:'Image',f:'e'}, tab:{icon:'↗',label:'Tableau',f:''}
 };
+/* ============ Annuler / Rétablir pour tout le cahier ============ */
+const HIST={undo:[],redo:[],pid:null,structural:false,suppress:false,burst:false,stable:null,idle:null};
+const snap=()=>JSON.stringify(page().rows);
+function histPush(s){ if(!s) return; const u=HIST.undo; if(u.length && u[u.length-1]===s) return; u.push(s); if(u.length>150) u.shift(); HIST.redo=[]; }
+function noteChange(){ // appelé à chaque modification de contenu : un « pas » d'annulation par moment de frappe
+  if(HIST.suppress) return;
+  if(!HIST.burst){ HIST.burst=true; histPush(HIST.stable); }
+  HIST.structural=false; clearTimeout(HIST.idle);
+  HIST.idle=setTimeout(()=>{ HIST.burst=false; HIST.stable=snap(); },1200);
+}
+function beforeStructural(){ // à appeler juste AVANT d'ajouter, supprimer, déplacer… un bloc
+  clearTimeout(HIST.idle); HIST.burst=false; histPush(snap()); HIST.structural=true; HIST.suppress=true;
+  setTimeout(()=>{ HIST.suppress=false; HIST.stable=snap(); },0);
+}
+function histRestore(s,focusId){
+  page().rows=JSON.parse(s); HIST.suppress=true; renderPage(); HIST.stable=s; HIST.burst=false;
+  const p=page(); p.dirty=true; save(); refreshFileStatus();
+  setTimeout(()=>{ HIST.suppress=false; },0);
+  const R=page().rows; const f=R.find(r=>r.id===focusId)||R[R.length-1]; if(f) focusRow(f.id,'end');
+}
+function undo(){
+  if(HIST.burst){ clearTimeout(HIST.idle); HIST.burst=false; }
+  const st=HIST.undo.pop(); if(!st){ toast('Rien à annuler'); return; }
+  HIST.redo.push(snap()); histRestore(st,currentId); HIST.structural=true; toast('Annulé (Ctrl+Y pour rétablir)');
+}
+function redo(){
+  const st=HIST.redo.pop(); if(!st){ toast('Rien à rétablir'); return; }
+  HIST.undo.push(snap()); histRestore(st,currentId); HIST.structural=true; toast('Rétabli');
+}
+const isEditable=t=>t && (t.tagName==='MATH-FIELD' || t.tagName==='INPUT' || t.tagName==='TEXTAREA' || t.isContentEditable);
+
 /* ============ Rendu ============ */
 const paper=document.getElementById('paper');
 const els=new Map();
@@ -220,7 +253,20 @@ function makeRowEl(row){
   del.title='Supprimer ce bloc (Ctrl+Maj+Retour arrière)';
   del.addEventListener('mousedown',e=>e.preventDefault());
   del.addEventListener('click',()=>deleteRow(row.id));
-  el.append(g,body,del);
+  if(row.locked && !state.settings.teacher){ // ligne d'énoncé : l'élève peut la lire, pas la modifier
+    requestAnimationFrame(()=>{ const mf=body.querySelector('math-field'); if(mf){ mf.readOnly=true; mf.setAttribute('read-only',''); }
+      const tx=body.querySelector('.txt'); if(tx) tx.contentEditable='false';
+      if(row.type!=='math'&&row.type!=='text'&&row.type!=='img') body.inert=true; });
+    del.style.visibility='hidden';
+  }
+  const mv=document.createElement('div'); mv.className='rmove';
+  if(state.settings.teacher){ const lk=document.createElement('button'); lk.textContent=row.locked?'🔒':'🔓'; lk.tabIndex=-1;
+    lk.title=row.locked?'Ligne d\u2019énoncé (protégée pour l\u2019élève) — clic pour la libérer':'Clic pour en faire une ligne d\u2019énoncé protégée';
+    lk.addEventListener('mousedown',e=>e.preventDefault()); lk.addEventListener('click',()=>toggleLock(row.id)); mv.append(lk); }
+  [['▲',-1,'Monter ce bloc (Alt+↑)'],['▼',1,'Descendre ce bloc (Alt+↓)']].forEach(([t,d,tt])=>{ const b=document.createElement('button'); b.textContent=t; b.title=tt; b.tabIndex=-1;
+    b.addEventListener('mousedown',e=>e.preventDefault()); b.addEventListener('click',()=>moveRow(row.id,d)); mv.append(b); });
+  el.append(g,body,mv,del);
+  if(row.locked){ el.classList.add('locked'); const bd=document.createElement('span'); bd.className='lockbadge'; bd.textContent='Énoncé'; body.append(bd); }
   if(row.type==='math') buildMath(row,body);
   else if(row.type==='text') buildText(row,body);
   else if(row.type==='graph') buildGraph(row,body);
@@ -234,7 +280,7 @@ function makeRowEl(row){
 function buildMath(row,body){
   if(!MFE){ const t=document.createElement('div'); t.className='txt'; t.textContent=row.value; body.append(t); return; }
   const mf=document.createElement('math-field');
-  mf.setAttribute('math-virtual-keyboard-policy','manual');
+  mf.setAttribute('math-virtual-keyboard-policy',vkbOn()?'auto':'manual');
   body.append(mf);
   const msg=document.createElement('div'); msg.className='calcmsg'; body.append(msg);
   mf.addEventListener('input',()=>{ row.value=mf.value; msg.textContent=''; scheduleSave(); scheduleAlign(); });
@@ -246,8 +292,10 @@ function buildMath(row,body){
   mf._setup=()=>setupMF(mf, row.value||'', '\\text{calcul…}');
 }
 // configuration d'un champ de formule une fois dans la page
+function vkbOn(){ const v=state.settings.vkb||'auto'; if(v==='on') return true; if(v==='off') return false;
+  try{ return matchMedia('(pointer: coarse)').matches && !matchMedia('(pointer: fine)').matches; }catch(e){ return false; } }
 function setupMF(mf,value,ph){
-  try{ mf.mathVirtualKeyboardPolicy='manual'; }catch(e){}
+  try{ mf.mathVirtualKeyboardPolicy=vkbOn()?'auto':'manual'; }catch(e){}
   try{ mf.inlineShortcuts=shortcutsFor(mf.inlineShortcuts); }catch(e){}
   try{ mf.smartFence=true; mf.smartSuperscript=true; }catch(e){}
   try{ mf.menuItems=[]; }catch(e){}
@@ -262,7 +310,7 @@ let lastMF=null;
 
 function buildText(row,body){
   const t=document.createElement('div');
-  t.className='txt'; t.contentEditable='true'; t.spellcheck=true;
+  t.className='txt'; t.contentEditable='true'; t.spellcheck=true; t.setAttribute('role','textbox'); t.setAttribute('aria-multiline','true'); t.setAttribute('aria-label','Texte');
   t.dataset.ph='Texte… (commence par # pour un titre)';
   t.textContent=row.value||'';
   const upd=()=>t.classList.toggle('title',/^#\s/.test(t.textContent));
@@ -337,11 +385,16 @@ function drawOp(row,grid,side,msg){
   msg.textContent='Commence par les unités (à droite). Après chaque chiffre, le curseur passe à la colonne suivante. ↑ pour écrire une retenue.';
 }
 /* --- grille générique (multiplication, division) : chaque case a une ligne r et une colonne c --- */
+const PLACE_NAMES={'0':'unités','1':'dizaines','2':'centaines','3':'milliers','4':'dizaines de mille','5':'centaines de mille','6':'millions','-1':'dixièmes','-2':'centièmes','-3':'millièmes'};
+function cellAria(key){ const m=key.match(/^(\w)(\d*):?(-?\d+)?$/); if(!m) return 'case';
+  const kind={c:'retenue',p:'produit partiel '+((+m[2]||0)+1),r:'résultat',w:'ligne de calcul '+m[2],q:'quotient',s:'signe'}[m[1]]||'case';
+  if(m[1]==='w') return kind+', colonne '+m[3]; if(m[1]==='q') return 'quotient, chiffre '+(+m[3]+1); if(m[1]==='s') return 'signe, ligne '+m[2];
+  return kind+', '+(PLACE_NAMES[m[3]]||'colonne'); }
 const placeCls=q=>{ const r=q%3; return r===0?'colU':r===1?'colD':'colC'; };
 function gCell(row,key,r,c,dir,cls,opts){
   const d=document.createElement('div'); d.className='cell '+(cls||'');
   const i=document.createElement('input'); i.inputMode='numeric'; i.maxLength=1; i.autocomplete='off';
-  i.dataset.key=key; i.dataset.r=r; i.dataset.c=c; i.dataset.dir=dir;
+  i.dataset.key=key; i.dataset.r=r; i.dataset.c=c; i.dataset.dir=dir; i.setAttribute('aria-label',cellAria(key));
   if(opts&&opts.comma) i.dataset.comma=1; if(opts&&opts.sign) i.dataset.sign=1;
   const C=row.value.cells=row.value.cells||{};
   i.value=C[key]||''; if(C[key+'#']) d.classList.add('cm');
@@ -460,7 +513,7 @@ function drawDiv(row,grid,side,msg,p){
 function cellInput(row,kind,place){
   const i=document.createElement('input');
   i.inputMode='numeric'; i.maxLength=1; i.autocomplete='off';
-  i.dataset.kind=kind; i.dataset.place=place;
+  i.dataset.kind=kind; i.dataset.place=place; i.setAttribute('aria-label',(kind==='ret'?'retenue':'résultat')+', '+(PLACE_NAMES[place]||'colonne'));
   i.value=(row.value[kind]&&row.value[kind][place])||'';
   i.addEventListener('keydown',e=>opKey(e,row,i));
   i.addEventListener('focus',()=>i.select());
@@ -684,6 +737,7 @@ function buildTree(row,body){
         const inp=document.createElement('input'); inp.type='text'; inp.className='tp'; inp.inputMode='decimal'; inp.autocomplete='off';
         inp.style.left=((px+x-6)/2)+'px'; inp.style.top=((py+y)/2)+'px';
         inp.value=V.p[path]||''; inp.dataset.path=path; inp.title='Probabilité : 0,3 ou 3/10 ou 30 %';
+        inp.setAttribute('aria-label','Probabilité de la branche '+path.split('-').map((x,LL)=>evName(LL,+x)).join(' puis '));
         inp.addEventListener('input',()=>{ if(inp.value) V.p[path]=inp.value; else delete V.p[path]; changed(); });
         stage.append(inp); probInputs.push(inp);
         if(L<nL-1) place(L+1,path,x+nodeW,y,s);
@@ -773,6 +827,7 @@ function buildTab(row,body){
   });
   function keyCell(L,key,r,c){
     const inp=document.createElement('input'); inp.className='tk'; inp.autocomplete='off'; inp.dataset.r=r; inp.dataset.c=c;
+    inp.setAttribute('aria-label',(L.label||(L.kind==='var'?'variations':'signe'))+(key[0]==='i'?', intervalle '+(+key.slice(1)+1):', valeur de x numéro '+(+key.slice(1)+1)));
     const isInt=key[0]==='i';
     inp.title = isInt ? (L.kind==='var'?'Tape + (croissante ↗), − (décroissante ↘) ou = (constante)':'Tape + ou −') : 'Tape 0, ou | pour une valeur interdite';
     inp.addEventListener('keydown',e=>{
@@ -793,7 +848,7 @@ function buildTab(row,body){
     const cell=cls=>{ const d=document.createElement('div'); d.className='tc '+(cls||''); grid.append(d); return d; };
     const lx=cell('tlab xrow'); lx.textContent='x';
     for(let j=0;j<n;j++){ const d=cell('tb xrow');
-      const inp=document.createElement('input'); inp.className='tx'; inp.value=prettyX(V.xs[j]); inp.placeholder=j===0?'−∞':j===n-1?'+∞':'…'; inp.dataset.r=0; inp.dataset.c=2*j+1;
+      const inp=document.createElement('input'); inp.className='tx'; inp.value=prettyX(V.xs[j]); inp.setAttribute('aria-label','Valeur de x numéro '+(j+1)); inp.placeholder=j===0?'−∞':j===n-1?'+∞':'…'; inp.dataset.r=0; inp.dataset.c=2*j+1;
       inp.addEventListener('input',()=>{ V.xs[j]=inp.value; scheduleSave(); });
       inp.addEventListener('blur',()=>{ const pv=prettyX(inp.value); if(pv!==inp.value){ inp.value=pv; V.xs[j]=pv; scheduleSave(); } });
       d.append(inp); if(j<n-1) cell('ti xrow'); }
@@ -916,21 +971,26 @@ async function addImage(file,afterId){
 }
 
 /* ---------- Insertion dans la page ---------- */
+function ariaFix(root){ (root||document).querySelectorAll('button[title]:not([aria-label]),input[title]:not([aria-label])').forEach(b=>b.setAttribute('aria-label',b.title)); }
 function mount(row, afterEl){
   const el=makeRowEl(row);
   if(afterEl && afterEl.nextSibling) paper.insertBefore(el, afterEl.nextSibling);
   else if(afterEl) paper.append(el);
   else paper.append(el);
   els.set(row.id, el);
+  el.setAttribute('role','listitem'); el.setAttribute('aria-label',(BLOCKS[row.type]||BLOCKS.math).label+(row.locked?' (énoncé)':''));
+  ariaFix(el);
   el.querySelectorAll('math-field').forEach(mf=>{ if(mf._setup) mf._setup(); });
   if(el._afterMount) el._afterMount();
   return el;
 }
 function renderPage(){
+  if(HIST.pid!==state.current){ HIST.undo=[]; HIST.redo=[]; HIST.pid=state.current; HIST.burst=false; }
   paper.innerHTML=''; els.clear();
   page().rows.forEach(r=>mount(r,null));
   renderPageList();
   setTimeout(alignAll,60); setTimeout(alignAll,400); setTimeout(alignAll,1200);
+  HIST.stable=snap();
 }
 function renderPageList(){
   const sel=document.getElementById('pageSel'); sel.innerHTML='';
@@ -955,6 +1015,7 @@ function setCurrent(id){
   currentId=id; const el=els.get(id); if(el) el.classList.add('current');
 }
 function addRowAfter(id,type,value){
+  beforeStructural();
   const R=page().rows; const i=id?idx(id):R.length-1;
   const row={id:uid(),type,value: value!==undefined?value:(type==='op'?{expr:'',res:{},ret:{}}:type==='graph'?{fns:[''],view:null}:type==='tree'?{levels:[['A',''],['B','']],p:{},prod:true}:type==='tab'?newTab('var'):type==='img'?{src:'',w:100}:'')};
   R.splice(i+1,0,row);
@@ -965,34 +1026,48 @@ function addRowAfter(id,type,value){
 }
 function duplicate(id){
   const r=rowById(id); if(!r) return;
-  addRowAfter(id, r.type, JSON.parse(JSON.stringify(r.value)));
+  addRowAfter(id, r.type, JSON.parse(JSON.stringify(r.value))); // la copie n'est jamais verrouillée : l'élève peut travailler dessus
   toast('Ligne recopiée — corrige ce qui change');
 }
-function removeRow(id){
+function removeRow(id,noHist){
   const R=page().rows; const i=idx(id); if(i<0||R.length<=1) return;
+  if(!noHist) beforeStructural();
   R.splice(i,1); const el=els.get(id); if(el) el.remove(); els.delete(id);
   scheduleSave(); scheduleAlign();
 }
 // suppression avec possibilité d'annuler
 function deleteRow(id){
   const R=page().rows; const i=idx(id); if(i<0) return;
-  const saved=JSON.parse(JSON.stringify(R[i])); const pid=page().id;
+  if(R[i].locked && !state.settings.teacher){ toast('Cette ligne fait partie de l\u2019énoncé : elle ne peut pas être supprimée'); return; }
+  beforeStructural();
+  const type=R[i].type; const pid=page().id;
   const focusTo=prevId(id)||nextId(id);
   if(R.length<=1){ R.push({id:uid(),type:'math',value:''}); mount(R[R.length-1],els.get(id)); }
-  removeRow(id);
+  removeRow(id,true);
   focusRow(focusTo||page().rows[0].id,'end');
-  const B=BLOCKS[saved.type]||BLOCKS.math;
-  toast(B.label+' supprimé'+B.f,'Annuler',()=>{
-    if(page().id!==pid) return;
-    const rows=page().rows; const at=Math.min(i,rows.length);
-    rows.splice(at,0,saved);
-    const prevEl = at>0 ? els.get(rows[at-1].id) : null;
-    if(prevEl) mount(saved,prevEl); else { const el=mount(saved,null); paper.insertBefore(el,paper.firstChild); }
-    focusRow(saved.id,'end'); scheduleSave(); scheduleAlign();
-  });
+  const B=BLOCKS[type]||BLOCKS.math;
+  toast(B.label+' supprimé'+B.f,'Annuler',()=>{ if(page().id===pid) undo(); });
+}
+function toggleLock(id){
+  const r=rowById(id); if(!r) return; beforeStructural(); r.locked=!r.locked; if(!r.locked) delete r.locked;
+  const old=els.get(id); const el=makeRowEl(r); old.replaceWith(el); els.set(id,el);
+  el.querySelectorAll('math-field').forEach(m=>m._setup&&m._setup()); if(el._afterMount) el._afterMount();
+  setCurrent(id); scheduleSave(); toast(r.locked?'Ligne d\u2019énoncé : l\u2019élève ne pourra pas la modifier':'Ligne libérée');
+}
+function moveRow(id,dir){
+  { const r=rowById(id); if(r&&r.locked&&!state.settings.teacher){ toast('Les lignes d\u2019énoncé ne se déplacent pas'); return; } }
+  const R=page().rows; const i=idx(id), j=i+dir; if(i<0||j<0||j>=R.length) return;
+  beforeStructural();
+  [R[i],R[j]]=[R[j],R[i]];
+  const el=els.get(id), other=els.get(R[i].id);
+  if(dir<0) paper.insertBefore(el,other); else paper.insertBefore(other,el);
+  el.scrollIntoView({block:'nearest'}); scheduleSave(); scheduleAlign();
+  const mf=el.querySelector('math-field'); if(mf) requestAnimationFrame(()=>{ mf.focus(); });
 }
 function toggleType(id){
-  const r=rowById(id); if(!r||r.type==='op') return;
+  const r=rowById(id); if(!r||(r.type!=='math'&&r.type!=='text')) return;
+  if(r.locked && !state.settings.teacher) return;
+  beforeStructural();
   r.type = r.type==='math'?'text':'math';
   if(typeof r.value!=='string') r.value='';
   const old=els.get(id); const el=makeRowEl(r); old.replaceWith(el); els.set(id,el);
@@ -1202,13 +1277,13 @@ function colorAllParens(){ document.querySelectorAll('math-field').forEach(color
 
 /* ============ Réglages tout prêts ============ */
 const PRESETS={
-  defaut:{fs:20,lh:1.6,font:"'Lexend', Arial, sans-serif",theme:'clair',align:true,labels:true,check:true,focus:false,parens:false,rate:1},
-  dyspraxie:{fs:24,lh:1.8,font:"'Lexend', Arial, sans-serif",theme:'clair',align:true,labels:true,check:true,focus:false,parens:true,rate:1},
-  dyslexie:{fs:22,lh:2.0,font:"'Andika', Arial, sans-serif",theme:'creme',align:true,labels:true,check:true,focus:true,parens:true,rate:0.9},
-  dyscalculie:{fs:22,lh:1.8,font:"'Atkinson Hyperlegible', Arial, sans-serif",theme:'creme',align:true,labels:true,check:true,focus:false,parens:true,rate:0.85},
+  defaut:{simple:false,fs:20,lh:1.6,font:"'Lexend', Arial, sans-serif",theme:'clair',align:true,labels:true,check:true,focus:false,parens:false,rate:1},
+  dyspraxie:{simple:true,fs:24,lh:1.8,font:"'Lexend', Arial, sans-serif",theme:'clair',align:true,labels:true,check:true,focus:false,parens:true,rate:1},
+  dyslexie:{simple:true,fs:22,lh:2.0,font:"'Andika', Arial, sans-serif",theme:'creme',align:true,labels:true,check:true,focus:true,parens:true,rate:0.9},
+  dyscalculie:{simple:true,fs:22,lh:1.8,font:"'Atkinson Hyperlegible', Arial, sans-serif",theme:'creme',align:true,labels:true,check:true,focus:false,parens:true,rate:0.85},
 };
 function applyPreset(name){
-  Object.assign(state.settings,PRESETS[name]); applySettings(); syncSettingsUI(); colorAllParens(); scheduleSave(false);
+  Object.assign(state.settings,PRESETS[name]); applySettings(); syncSettingsUI(); colorAllParens(); renderTools(); scheduleSave(false);
   toast('Réglages « '+({defaut:'par défaut',dyspraxie:'dyspraxie',dyslexie:'dyslexie',dyscalculie:'dyscalculie'}[name])+' » appliqués — tu peux encore les ajuster');
 }
 
@@ -1222,6 +1297,12 @@ window.addEventListener('keydown',e=>{
   const ctrl=e.ctrlKey||e.metaKey; const k=e.key.toLowerCase();
   const stop=()=>{ e.preventDefault(); e.stopPropagation(); };
   if(ctrl && !e.shiftKey && !e.altKey && k==='k'){ stop(); openSearch(); return; }
+  if(ctrl && !e.altKey && ((k==='z'&&!e.shiftKey)||k==='y'||(k==='z'&&e.shiftKey))){
+    const isRedo = k==='y' || e.shiftKey;
+    // dans une formule ou un texte, on laisse d'abord l'annulation du champ lui-même ; sinon on annule dans le cahier
+    if(isEditable(e.target) && !HIST.structural) return;
+    stop(); if(isRedo) redo(); else undo(); return;
+  }
   if(ctrl && !e.altKey && k==='s'){ stop(); saveFile(e.shiftKey); return; }
   if(ctrl && !e.shiftKey && !e.altKey && k==='o'){ stop(); openFile(); return; }
   if(ctrl && !e.shiftKey && !e.altKey && k==='p'){ stop(); doPrint(); return; }
@@ -1229,6 +1310,7 @@ window.addEventListener('keydown',e=>{
   if(!rowEl) return;
   const id=rowEl.dataset.id; const row=rowById(id); if(!row) return;
   if(ctrl && e.shiftKey && e.key==='Backspace'){ stop(); deleteRow(id); return; }
+  if(e.altKey && !ctrl && (e.key==='ArrowUp'||e.key==='ArrowDown')){ stop(); moveRow(id,e.key==='ArrowUp'?-1:1); return; }
   if(ctrl && !e.shiftKey && k==='d'){ stop(); duplicate(id); return; }
   if(ctrl && !e.shiftKey && !e.altKey && k==='g'){ stop(); addRowAfter(id,'graph'); return; }
   if(ctrl && k==='m'){ stop(); toggleType(id); return; }
@@ -1286,23 +1368,35 @@ document.addEventListener('focusin',e=>{ const r=e.target.closest&&e.target.clos
 function toggleFocus(){ state.settings.focus=!state.settings.focus; applySettings(); syncSettingsUI(); scheduleSave(false); toast(state.settings.focus?'Mode concentration activé (F8 pour l\u2019enlever)':'Mode concentration désactivé'); }
 function renderTools(){
   const box=document.getElementById('tools'); box.innerHTML='';
-  const act=(label,keys,fn,title)=>{ const b=document.createElement('button'); b.className='tool'; b.title=title||label;
-    b.innerHTML='<span>'+label+'</span>'+(keys?' <kbd>'+keys+'</kbd>':''); b.addEventListener('mousedown',e=>e.preventDefault()); b.addEventListener('click',fn); box.append(b); };
-  act('＋ Calcul','Entrée',()=>addRowAfter(currentId,'math'),'Nouvelle ligne de calcul');
-  act('＋ Texte','Maj+Entrée',()=>addRowAfter(currentId,'text'),'Nouvelle ligne de texte');
-  if(state.settings.level!=='lycee') act('＋ Opération posée','Ctrl+Maj+Entrée',()=>addRowAfter(currentId,'op'));
-  act('Dupliquer','Ctrl+D',()=>{ if(currentId) duplicate(currentId); });
-  act('Calculer','Ctrl+Entrée',()=>{ const r=currentId&&rowById(currentId); if(r&&r.type==='math') compute(currentId); else toast('Place-toi sur une ligne de calcul'); });
-  if(state.settings.level!=='primaire') act('＋ Graphique','Ctrl+G',()=>addRowAfter(currentId,'graph'),'Tracer des fonctions');
-  if(state.settings.level==='lycee') act('＋ Tableau de variations','',()=>addRowAfter(currentId,'tab'),'Tableau de signes et de variations');
-  if(state.settings.level!=='primaire') act('＋ Arbre de probas','Ctrl+B',()=>addRowAfter(currentId,'tree'),'Arbre de probabilités');
-  act('＋ Image','Ctrl+V',()=>{ const r=addRowAfter(currentId,'img'); pickImageFor(r.id); },'Ajouter l\u2019énoncé : photo ou capture d\u2019écran');
-  act('🔊 Lire','F2',speakCurrent,'Lire la ligne à voix haute (Maj+F2 : toute la page). Appuie encore pour arrêter.');
-  act('🎯 Concentration','F8',toggleFocus,'Estomper les autres lignes');
-  document.getElementById('tools').lastElementChild.id='focusBtn'; if(state.settings.focus) document.getElementById('focusBtn').classList.add('primary');
-  act('🔍 Symbole','Ctrl+K',openSearch,'Chercher un symbole par son nom');
+  const simple=!!state.settings.simple, L=state.settings.level;
+  const act=(label,keys,fn,title,id)=>{ const b=document.createElement('button'); b.className='tool'; b.title=title||label; if(id) b.id=id;
+    b.innerHTML='<span>'+label+'</span>'+(keys&&!simple?' <kbd>'+keys+'</kbd>':''); b.addEventListener('mousedown',e=>e.preventDefault()); b.addEventListener('click',fn); box.append(b); return b; };
+  act('↶','Ctrl+Z',undo,'Annuler (Ctrl+Z)','undoBtn'); act('↷','Ctrl+Y',redo,'Rétablir (Ctrl+Y)','redoBtn');
+  const sep=()=>{ const d=document.createElement('div'); d.className='sep'; box.append(d); }; sep();
+  act('＋ Calcul','Entrée',()=>addRowAfter(currentId,'math'),'Nouvelle ligne de calcul (Entrée)');
+  act('＋ Texte','Maj+Entrée',()=>addRowAfter(currentId,'text'),'Nouvelle ligne de texte (Maj+Entrée)');
+  if(!simple){
+    if(L!=='lycee') act('＋ Opération posée','Ctrl+Maj+Entrée',()=>addRowAfter(currentId,'op'));
+    if(L!=='primaire') act('＋ Graphique','Ctrl+G',()=>addRowAfter(currentId,'graph'),'Tracer des fonctions');
+    if(L==='lycee') act('＋ Tableau de variations','',()=>addRowAfter(currentId,'tab'),'Tableau de signes et de variations');
+    if(L!=='primaire') act('＋ Arbre de probas','Ctrl+B',()=>addRowAfter(currentId,'tree'),'Arbre de probabilités');
+    act('＋ Image','Ctrl+V',()=>{ const r=addRowAfter(currentId,'img'); pickImageFor(r.id); },'Ajouter l\u2019énoncé : photo ou capture d\u2019écran');
+    sep();
+  }
+  act('Dupliquer','Ctrl+D',()=>{ if(currentId) duplicate(currentId); },'Recopier la ligne en dessous (Ctrl+D)');
+  if(!simple) act('Calculer','Ctrl+Entrée',()=>{ const r=currentId&&rowById(currentId); if(r&&r.type==='math') compute(currentId); else toast('Place-toi sur une ligne de calcul'); });
+  act('🔊 Lire','F2',speakCurrent,'Lire la ligne à voix haute (F2 ; Maj+F2 : toute la page). Appuie encore pour arrêter.');
+  const fb=act('🎯','F8',toggleFocus,'Mode concentration : estomper les autres lignes (F8)','focusBtn'); if(state.settings.focus) fb.classList.add('primary');
+  act('🔍 Symbole','Ctrl+K',openSearch,'Chercher un symbole ou un outil par son nom (Ctrl+K)');
+  const sw=act(simple?'☰ Tous les outils':'Mode simple','',toggleSimple, simple?'Afficher tous les boutons':'N\u2019afficher que l\u2019essentiel (tout reste accessible au clavier et avec Ctrl+K)');
+  sw.classList.add('simple-toggle');
+  ariaFix(box);
+  document.getElementById('cats').style.display=simple?'none':'';
+  document.getElementById('items').style.display=simple?'none':'';
   renderCats();
 }
+function toggleSimple(){ state.settings.simple=!state.settings.simple; renderTools(); syncSettingsUI(); scheduleSave(false);
+  toast(state.settings.simple?'Mode simple : tous les outils restent dans Ctrl+K':'Tous les outils sont affichés'); }
 let curCat=null;
 function renderCats(){
   const cats=document.getElementById('cats'); cats.innerHTML='';
@@ -1332,6 +1426,7 @@ function targetMF(){
 }
 function insertTpl(tpl){
   if(tpl==='@tabsign'){ addRowAfter(currentId,'tab',newTab('sign')); return; }
+  if(tpl==='@img'){ const r=addRowAfter(currentId,'img'); pickImageFor(r.id); return; }
   if(tpl[0]==='@'){ addRowAfter(currentId,tpl.slice(1)); return; }
   const mf=targetMF(); if(!mf) return;
   mf.focus();
@@ -1454,11 +1549,19 @@ function renderHelp(){
     ['<kbd>Ctrl</kbd>+<kbd>P</kbd>','imprimer ou enregistrer en PDF une copie propre (nom, date, titre)'],
     ['<kbd>Ctrl</kbd>+<kbd>V</kbd> d\u2019une capture','mettre l\u2019énoncé en image dans le cahier (ou glisse une photo sur la page)'],
   ]);
+  h+='<h3>Pour les professeurs : fiches d\u2019exercices</h3>'+rows([
+    ['Réglages → Mode professeur','survole une ligne et clique sur 🔓 pour en faire une ligne d\u2019<b>énoncé</b> protégée (🔒), puis enregistre la fiche (Ctrl+S) et donne le fichier aux élèves'],
+    ['Côté élève','il ouvre la fiche (Ctrl+O) : l\u2019énoncé ne peut être ni modifié ni supprimé, il écrit ses réponses dessous. Ctrl+S crée <b>sa</b> copie « … - mes réponses », sans écraser la fiche'],
+    ['Exporter… → Word','pour rendre un devoir sur l\u2019ENT si le PDF n\u2019est pas accepté'],
+  ]);
   h+='<h3>Enregistrer et ouvrir</h3>'+rows([
     ['<kbd>Ctrl</kbd>+<kbd>S</kbd>','enregistrer le cahier dans un fichier <b>.mathdys</b> sur ton ordinateur. Les fois suivantes, le même fichier est mis à jour (Chrome, Edge) ou un nouveau est téléchargé (Firefox, Safari)'],
     ['<kbd>Ctrl</kbd>+<kbd>Maj</kbd>+<kbd>S</kbd>','enregistrer sous un autre nom'],
     ['<kbd>Ctrl</kbd>+<kbd>O</kbd>','ouvrir un cahier .mathdys — ou glisse le fichier sur la page'],
     ['Pastille rouge en haut','il y a des changements pas encore enregistrés dans le fichier'],
+    ['Sur plusieurs appareils','enregistre tes cahiers dans ton dossier OneDrive, Google Drive ou celui de l\u2019ENT : tu les retrouves partout, sans compte MathDys'],
+    ['<kbd>Ctrl</kbd>+<kbd>Z</kbd> / <kbd>Ctrl</kbd>+<kbd>Y</kbd>','annuler / rétablir (dans une formule, puis dans tout le cahier). Les boutons ↶ ↷ annulent toujours dans le cahier'],
+    ['<kbd>Alt</kbd>+<kbd>↑</kbd> / <kbd>Alt</kbd>+<kbd>↓</kbd>','monter / descendre le bloc (ou ▲▼ à droite)'],
   ]);
   h+='<p style="font-size:.75em;margin-top:1em;color:var(--muted)">MathDys version '+APP_VERSION+'. Pour l\u2019avoir même sans Internet : ouvre le site une fois connecté, puis installe-le (icône ⊕ dans la barre d\u2019adresse de Chrome ou Edge).</p>';
   h+='<p style="font-size:.75em;margin-top:1em">Une idée, un bug ? Écris à <a href="mailto:git.public@protonmail.com?subject=MathDys">git.public@protonmail.com</a></p>';
@@ -1477,7 +1580,7 @@ document.getElementById('askOk').addEventListener('click',()=>{ document.getElem
 function applySettings(){
   const s=state.settings, r=document.documentElement.style;
   r.setProperty('--fs',s.fs+'px'); r.setProperty('--lh',s.lh); r.setProperty('--font',s.font);
-  document.body.className='theme-'+s.theme+(s.focus?' focusmode':'');
+  document.body.className='theme-'+s.theme+(s.focus?' focusmode':'')+(vkbOn()?' vkb':'');
   const fb=document.getElementById('focusBtn'); if(fb) fb.classList.toggle('primary',!!s.focus);
   document.getElementById('levelSel').value=s.level;
   scheduleAlign();
@@ -1488,9 +1591,9 @@ function syncSettingsUI(){ BOUND.forEach(([el,key])=>{ if(el.type==='checkbox') 
 document.querySelectorAll('[data-preset]').forEach(b=>b.addEventListener('click',()=>applyPreset(b.dataset.preset)));
 const bind=(id,key,conv,ev)=>{ const el=document.getElementById(id); BOUND.push([el,key]);
   if(el.type==='checkbox') el.checked=!!state.settings[key]; else el.value=state.settings[key];
-  el.addEventListener(ev||'input',()=>{ state.settings[key]= el.type==='checkbox'?el.checked:conv(el.value); applySettings(); if(key==='labels'||key==='check') renderPage(); if(key==='parens') colorAllParens(); scheduleSave(false); }); };
+  el.addEventListener(ev||'input',()=>{ state.settings[key]= el.type==='checkbox'?el.checked:conv(el.value); applySettings(); if(key==='labels'||key==='check') renderPage(); if(key==='parens') colorAllParens(); if(key==='simple') renderTools(); if(key==='vkb'||key==='teacher') renderPage(); if(key==='teacher') toast(state.settings.teacher?'Mode professeur : survole une ligne et clique sur 🔓 pour la protéger':'Mode professeur désactivé'); scheduleSave(false); }); };
 bind('sFs','fs',Number); bind('sLh','lh',Number); bind('sFont','font',String,'change'); bind('sTheme','theme',String,'change');
-bind('sName','name',String); bind('sFocus','focus',Boolean,'change'); bind('sParens','parens',Boolean,'change'); bind('sRate','rate',Number); bind('sAlign','align',Boolean,'change'); bind('sLabels','labels',Boolean,'change'); bind('sCheck','check',Boolean,'change');
+bind('sName','name',String); bind('sFocus','focus',Boolean,'change'); bind('sParens','parens',Boolean,'change'); bind('sRate','rate',Number); bind('sSimple','simple',Boolean,'change'); bind('sTeacher','teacher',Boolean,'change'); bind('sVkb','vkb',String,'change'); bind('sAlign','align',Boolean,'change'); bind('sLabels','labels',Boolean,'change'); bind('sCheck','check',Boolean,'change');
 document.getElementById('levelSel').addEventListener('change',e=>{ state.settings.level=e.target.value; renderTools(); scheduleSave(false); toast('Niveau : '+e.target.selectedOptions[0].textContent); });
 document.getElementById('settingsBtn').addEventListener('click',()=>openDlg('setDlg'));
 document.getElementById('helpBtn').addEventListener('click',()=>openDlg('helpDlg'));
@@ -1516,12 +1619,95 @@ function preparePrint(){
 window.addEventListener('beforeprint',preparePrint);
 function doPrint(){ preparePrint(); try{ window.print(); }catch(e){ toast('Impression impossible ici'); } }
 document.getElementById('printBtn').addEventListener('click',doPrint);
-document.getElementById('copyBtn').addEventListener('click',async()=>{
-  const lines=page().rows.map(r=> r.type==='math' ? '$'+r.value+'$' : r.type==='op' ? '[opération posée] '+(r.value.expr||'') : r.type==='img' ? '[image]' : r.type==='tab' ? '[tableau]' : r.type==='tree' ? '[arbre] '+r.value.levels.map(l=>l.map(prettyEv).join('/')).join(' puis ') : r.type==='graph' ? '[graphique] '+r.value.fns.map((f,i)=>GNAMES[i%GNAMES.length]+'(x)=$'+f+'$').join(' ; ') : r.value);
-  const txt=(page().title?page().title+'\n\n':'')+lines.join('\n');
-  try{ await navigator.clipboard.writeText(txt); toast('Page copiée (les calculs en LaTeX)'); }
+/* ============ Export : texte lisible, LaTeX, Word / LibreOffice ============ */
+const SUP={'0':'⁰','1':'¹','2':'²','3':'³','4':'⁴','5':'⁵','6':'⁶','7':'⁷','8':'⁸','9':'⁹','+':'⁺','-':'⁻','n':'ⁿ','x':'ˣ','i':'ⁱ'};
+const SUB={'0':'₀','1':'₁','2':'₂','3':'₃','4':'₄','5':'₅','6':'₆','7':'₇','8':'₈','9':'₉','+':'₊','-':'₋','n':'ₙ','k':'ₖ','p':'ₚ','i':'ᵢ'};
+const conv=(s,map,pre)=>[...s].every(c=>map[c])?[...s].map(c=>map[c]).join(''):pre+'('+s+')';
+function latexToUnicode(src){
+  let t=src||'';
+  t=t.replace(/\\m?left|\\m?right/g,'').replace(/\{,\}/g,',').replace(/\\text\{([^{}]*)\}/g,'$1').replace(/\\[,;:! ]/g,' ');
+  t=t.replace(/\\begin\{cases\}/g,'⦃ ').replace(/\\end\{cases\}/g,' ⦄').replace(/\\begin\{pmatrix\}/g,'[ ').replace(/\\end\{pmatrix\}/g,' ]').replace(/\\\\/g,' ; ').replace(/&/g,'  ');
+  t=t.replace(/\\lim_\{([^{}]*)\\to([^{}]*)\}/g,'lim($1→$2) ');
+  const simple=x=>/^[\w.,]+$|^\\?[a-zA-Z]$/.test(x.trim());
+  for(let n=0;n<40;n++){ const b=t;
+    t=t.replace(/\\[dt]?frac\{([^{}]*)\}\{([^{}]*)\}/g,(m,a,c)=>(simple(a)?a:'('+a+')')+'/'+(simple(c)?c:'('+c+')'));
+    t=t.replace(/\\binom\{([^{}]*)\}\{([^{}]*)\}/g,'($1 parmi $2)'.replace('$1 parmi $2','$2 parmi $1'));
+    t=t.replace(/\\sqrt\[([^{}\]]*)\]\{([^{}]*)\}/g,'$1√($2)');
+    t=t.replace(/\\sqrt\{([^{}]*)\}/g,(m,a)=>'√'+(simple(a)?a:'('+a+')'));
+    t=t.replace(/\\overrightarrow\{([^{}]*)\}/g,(m,a)=>'vect('+a+')');
+    t=t.replace(/\\overline\{([^{}]*)\}/g,(m,a)=>[...a].map(c=>c+'̅').join(''));
+    t=t.replace(/\\widehat\{([^{}]*)\}/g,'∠$1');
+    t=t.replace(/\\mathbb\{([A-Z])\}/g,(m,a)=>({N:'ℕ',Z:'ℤ',Q:'ℚ',R:'ℝ',C:'ℂ'}[a]||a));
+    t=t.replace(/\^\{\\circ\}/g,'°');
+    t=t.replace(/\^\{([^{}]*)\}/g,(m,a)=>conv(a,SUP,'^')).replace(/\^([0-9a-z])/g,(m,a)=>conv(a,SUP,'^'));
+    t=t.replace(/_\{([^{}]*)\}/g,(m,a)=>conv(a,SUB,'_')).replace(/_([0-9a-z])/g,(m,a)=>conv(a,SUB,'_'));
+    t=t.replace(/(^|[^a-zA-Z\]\}\^_\\])\{([^{}]*)\}/g,'$1$2');
+    if(t===b) break; }
+  const M={'\\times':'×','\\cdot':'·','\\div':'÷','\\le':'≤','\\ge':'≥','\\ne':'≠','\\approx':'≈','\\pm':'±','\\pi':'π','\\infty':'∞',
+    '\\notin':'∉','\\in':'∈','\\subset':'⊂','\\cap':'∩','\\cup':'∪','\\varnothing':'∅','\\Rightarrow':'⇒','\\Leftrightarrow':'⇔','\\forall':'∀','\\exists':'∃',
+    '\\mapsto':'↦','\\to':'→','\\sum':'Σ','\\int':'∫','\\perp':'⊥','\\parallel':'∥','\\%':'%','\\Delta':'Δ','\\Omega':'Ω','\\alpha':'α','\\beta':'β',
+    '\\gamma':'γ','\\delta':'δ','\\theta':'θ','\\lambda':'λ','\\mu':'μ','\\sigma':'σ','\\omega':'ω','\\sin':'sin','\\cos':'cos','\\tan':'tan','\\ln':'ln','\\exp':'exp','\\det':'det','\\placeholder':''};
+  Object.keys(M).sort((a,b)=>b.length-a.length).forEach(k=>{ t=t.split(k).join(M[k]); });
+  return t.replace(/\\[a-zA-Z]+/g,'').replace(/[{}]/g,'').replace(/⦃/g,'{').replace(/⦄/g,'}').replace(/\s+/g,' ').trim();
+}
+function blockText(r,latex){
+  if(r.type==='math') return latex ? '$'+r.value+'$' : latexToUnicode(r.value);
+  if(r.type==='text') return (r.value||'').replace(/^#\s*/,'');
+  if(r.type==='op') return 'Opération posée : '+(r.value.expr||'');
+  if(r.type==='graph') return 'Graphique : '+r.value.fns.filter(Boolean).map((f,i)=>GNAMES[i]+'(x) = '+(latex?'$'+f+'$':latexToUnicode(f))).join(' ; ');
+  if(r.type==='tree'){ const el=els.get(r.id); const pr=el?[...el.querySelectorAll('.tprod')].map(x=>x.textContent):[]; return 'Arbre de probabilités'+(pr.length?' : '+pr.join(' ; '):''); }
+  if(r.type==='tab') return '[tableau de signes / de variations : voir le PDF]';
+  if(r.type==='img') return '[image]';
+  return '';
+}
+async function copyPage(latex){
+  const txt=(page().title?page().title+'\n\n':'')+page().rows.map(r=>blockText(r,latex)).filter(Boolean).join('\n');
+  try{ await navigator.clipboard.writeText(txt); toast(latex?'Page copiée (calculs en LaTeX)':'Page copiée en texte lisible'); }
   catch(e){ toast('Copie refusée par le navigateur'); }
+}
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+function gridToTable(grid,colsCount){
+  const kids=[...grid.children].filter(d=>!(d instanceof SVGElement));
+  let html='<table>'; kids.forEach((d,k)=>{ if(k%colsCount===0) html+=(k?'</tr>':'')+'<tr>';
+    const inp=d.querySelector('input'); let v=inp?inp.value:d.textContent; if(d.classList.contains('cm')) v+=',';
+    if(d.classList.contains('bar2')&&!v) v='||';
+    html+='<td>'+esc(v)+'</td>'; });
+  return html+'</tr></table>';
+}
+function rowToHtml(r,mathml){
+  const el=els.get(r.id);
+  if(r.type==='text'){ const v=r.value||''; return /^#\s/.test(v)?'<h2>'+esc(v.replace(/^#\s*/,''))+'</h2>':'<p>'+esc(v).replace(/\n/g,'<br>')+'</p>'; }
+  if(r.type==='math'){ if(!r.value) return '';
+    if(mathml){ try{ const ML=window.MathLive; let m=ML&&ML.convertLatexToMathMl?ML.convertLatexToMathMl(r.value):null;
+        if(m){ if(!/^<math/.test(m)) m='<math xmlns="http://www.w3.org/1998/Math/MathML">'+m+'</math>'; return '<p>'+m+'</p>'; } }catch(e){} }
+    return '<p>'+esc(latexToUnicode(r.value))+'</p>'; }
+  if(r.type==='img') return r.value.src?'<p><img src="'+r.value.src+'" style="max-width:100%"></p>':'';
+  if(r.type==='graph'){ const cv=el&&el.querySelector('canvas'); let h='<p>'+esc(blockText(r,false))+'</p>';
+    try{ if(cv) h+='<p><img src="'+cv.toDataURL('image/png')+'" width="600"></p>'; }catch(e){} return h; }
+  if(r.type==='op'){ const g=el&&el.querySelector('.op-grid'); const n=g?(g.style.gridTemplateColumns||'').trim().split(/\s+/).length:0;
+    return '<p><b>'+esc(r.value.expr||'')+'</b></p>'+(g&&n?gridToTable(g,n):''); }
+  if(r.type==='tab'){ const g=el&&el.querySelector('.tab-grid'); return g?gridToTable(g,2*r.value.xs.length):''; }
+  if(r.type==='tree') return '<p>'+esc(blockText(r,false))+'</p>';
+  return '';
+}
+function exportDoc(mathml){
+  const p=page();
+  const body=page().rows.map(r=>rowToHtml(r,mathml)).join('\n');
+  const head=(state.settings.name?'<p style="color:#555">'+esc(state.settings.name)+' — '+new Date().toLocaleDateString('fr-FR')+'</p>':'');
+  const html='<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40"><head><meta charset="utf-8"><title>'+esc(p.title||'MathDys')+'</title>'
+    +'<style>body{font-family:Arial,sans-serif;font-size:13pt;line-height:1.5} h1{font-size:18pt} h2{font-size:15pt;color:#2f6fde} table{border-collapse:collapse;margin:6pt 0} td{border:1px solid #999;padding:2pt 6pt;text-align:center;min-width:14pt}</style></head><body>'
+    +head+'<h1>'+esc(p.title||'')+'</h1>'+body+'</body></html>';
+  const blob=new Blob(['﻿'+html],{type:'application/msword'}); const url=URL.createObjectURL(blob);
+  const a=document.createElement('a'); a.href=url; a.download=(p.title||'cahier').replace(/[\\/:*?"<>|]+/g,'-').trim()+(mathml?' (Word)':' (texte)')+'.doc';
+  document.body.append(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(url),3000);
+  toast(mathml?'Fichier Word créé : les formules deviennent des équations Word':'Fichier créé : les formules sont écrites en texte simple');
+}
+document.getElementById('exportSel').addEventListener('change',e=>{
+  const v=e.target.value; e.target.value='';
+  if(v==='txt') copyPage(false); else if(v==='latex') copyPage(true);
+  else if(v==='word') exportDoc(true); else if(v==='odt') exportDoc(false); else if(v==='pdf') doPrint();
 });
+
 /* ============ Fichiers sur l'ordinateur (aucun compte, aucun serveur) ============ */
 const FILE_EXT='.mathdys';
 const handles=new Map(); // page → fichier ouvert (Chrome/Edge), pour réenregistrer au même endroit
@@ -1533,18 +1719,19 @@ async function saveFile(as){
   try{
     if(window.showSaveFilePicker){
       let h=handles.get(p.id);
-      if(!h||as){ h=await window.showSaveFilePicker({suggestedName:p.fileName&&!as?p.fileName:name, types:FTYPES}); handles.set(p.id,h); }
+      if(!h||as){ h=await window.showSaveFilePicker({suggestedName:p.suggest||(p.fileName&&!as?p.fileName:name), types:FTYPES}); handles.set(p.id,h); }
       const w=await h.createWritable(); await w.write(data); await w.close();
       p.fileName=h.name;
     } else {
       const blob=new Blob([data],{type:'application/json'}); const url=URL.createObjectURL(blob);
-      const a=document.createElement('a'); a.href=url; a.download=name; document.body.append(a); a.click(); a.remove();
-      setTimeout(()=>URL.revokeObjectURL(url),3000); p.fileName=name;
+      const fname=p.suggest||p.fileName||name;
+      const a=document.createElement('a'); a.href=url; a.download=fname; document.body.append(a); a.click(); a.remove();
+      setTimeout(()=>URL.revokeObjectURL(url),3000); p.fileName=fname;
     }
-    p.dirty=false; save(); toast('Enregistré dans « '+p.fileName+' »');
+    delete p.suggest; p.dirty=false; save(); toast('Enregistré dans « '+p.fileName+' »');
   }catch(e){
     if(e && e.name==='AbortError') return;
-    toast('Enregistrement impossible ici. Utilise « Copier » en attendant.');
+    toast('Enregistrement impossible ici. Utilise « Exporter… → Copier » en attendant.');
   }
 }
 async function openFile(){
@@ -1564,11 +1751,16 @@ function loadFileText(txt,name,handle){
   let p=state.pages.find(q=>q.fileName===name);
   if(p){ p.title=title; p.rows=rows; }
   else { p={id:uid(),title,rows}; state.pages.push(p); }
-  p.fileName=name; p.dirty=false; state.current=p.id;
+  p.fileName=name; p.dirty=false; state.current=p.id; delete p.suggest;
   if(handle) handles.set(p.id,handle); else handles.delete(p.id);
+  const fiche=rows.some(r=>r.locked) && !state.settings.teacher;
+  if(fiche){ // fiche du professeur : on n'écrase jamais l'original, l'élève enregistre SA copie
+    handles.delete(p.id); p.fileName=null; p.dirty=true; p.suggest=name.replace(/\.mathdys$/i,'')+' - mes réponses'+FILE_EXT; }
   // retire la page vide de départ si elle n'a jamais servi
   state.pages=state.pages.filter(q=>q===p || q.dirty || q.fileName || q.rows.some(r=>!isEmpty(r)));
-  renderPage(); save(); toast('« '+name+' » ouvert');
+  renderPage(); save();
+  if(fiche) toast('Fiche d\u2019exercice : l\u2019énoncé est protégé. Écris tes réponses, puis Ctrl+S pour enregistrer TA copie.','OK',()=>{});
+  else toast('« '+name+' » ouvert');
 }
 document.getElementById('openBtn').addEventListener('click',openFile);
 document.getElementById('saveBtn').addEventListener('click',()=>saveFile(false));
@@ -1599,7 +1791,7 @@ function toast(t,actLabel,actFn){
 }
 
 /* ============ Hors ligne : installation comme une application ============ */
-const APP_VERSION='0.3.0';
+const APP_VERSION='0.4.0';
 try{
   if('serviceWorker' in navigator && location.protocol==='https:' && window.self===window.top)
     navigator.serviceWorker.register('sw.js').catch(()=>{});
@@ -1607,10 +1799,64 @@ try{
 // ouvrir un fichier .mathdys directement depuis l'ordinateur (application installée, Chrome/Edge)
 try{ if('launchQueue' in window) window.launchQueue.setConsumer(async p=>{ for(const h of (p.files||[])){ const f=await h.getFile(); loadFileText(await f.text(), f.name, h); } }); }catch(e){}
 
+/* ============ Auto-test (ouvrir le site avec #test à la fin de l'adresse) ============ */
+function runSelfTest(){
+  const res=[]; const ok=(name,cond,detail)=>res.push({name,ok:!!cond,detail:detail||''});
+  const eq=(name,got,want)=>ok(name,got===want,'obtenu : '+JSON.stringify(got)+' / attendu : '+JSON.stringify(want));
+  const near=(name,got,want)=>ok(name,got!==null&&Math.abs(got-want)<1e-9,'obtenu : '+got+' / attendu : '+want);
+  // calculatrice
+  near('calcul 3×4+½',evalLatex('3\\times4+\\frac{1}{2}'),12.5);
+  near('calcul −2²',evalLatex('-2^{2}'),-4);
+  near('calcul 5!',evalLatex('5!'),120);
+  near('calcul 2,5×4',evalLatex('2{,}5\\times4'),10);
+  eq('calcul refuse les lettres',evalLatex('x+1'),null);
+  eq('fraction exacte ⅓+⅙',formatResult(0.5,'\\frac{1}{3}+\\frac{1}{6}').tex,'\\frac{1}{2}=0{,}5');
+  // courbes
+  const f=compileExpr('3x^{2}-2x+1',['x']); near('fonction 3x²−2x+1 en 2',f&&f({x:2}),9);
+  const g=compileExpr('\\sin\\left(x\\right)',['x']); near('fonction sin(π/2)',g&&g({x:Math.PI/2}),1);
+  const h=compileExpr('e^{x}',['x']); near('fonction eˣ en 0',h&&h({x:0}),1);
+  // alignement
+  eq('découpage au signe =',splitTopEq('3x+2=8').length,2);
+  // opérations posées
+  eq('lecture de « 156 : 12 »',(parseOp('156 : 12')||{}).op,'÷');
+  eq('lecture de « 123 x 45 »',(parseOp('123 x 45')||{}).op,'×');
+  eq('lecture de « 52,4 − 7,85 »',(parseOp('52,4 − 7,85')||{}).op,'-');
+  // probabilités et tableaux
+  near('probabilité « 30 % »',parseP('30 %'),0.3); near('probabilité « 3/10 »',parseP('3/10'),0.3);
+  eq('contraire de A',prettyEv('A barre'),'A̅');
+  eq('valeur x « -inf »',prettyX('-inf'),'−∞');
+  // lecture à voix haute
+  eq('lecture x²−3x+2',latexToSpeech('x^{2}-3x+2'),'x au carré moins 3 x plus 2');
+  eq('lecture d’un système',latexToSpeech('\\begin{cases}x+y=3\\\\x-y=1\\end{cases}'),'système : x plus y égale 3; x moins y égale 1.');
+  // chaque type de bloc se construit sans erreur
+  const samples={math:'3x+2=8',text:'# Titre',op:{expr:'123 × 45',res:{},ret:{},cells:{}},graph:{fns:['x^2'],view:null},
+    tree:{levels:[['A',''],['B','']],p:{'0':'0,3'},prod:true},tab:newTab('var'),img:{src:'',w:100}};
+  const box=document.createElement('div'); box.style.cssText='position:absolute;left:-9999px;top:0;width:900px'; document.body.append(box);
+  Object.entries(samples).forEach(([type,value])=>{
+    try{ const el=makeRowEl({id:'t'+type,type,value:JSON.parse(JSON.stringify(value))}); box.append(el); el.querySelectorAll('math-field').forEach(m=>m._setup&&m._setup()); if(el._afterMount) el._afterMount(); ok('bloc « '+BLOCKS[type].label+' »',true); }
+    catch(e){ ok('bloc « '+BLOCKS[type].label+' »',false,String(e&&e.message||e)); }
+  });
+  ['+ 345 + 78','× 123 × 45','÷ 156 : 12'].forEach(x=>{ const [, ...rest]=x.split(' '); const expr=rest.join(' ');
+    try{ const el=makeRowEl({id:'o'+expr,type:'op',value:{expr,res:{},ret:{},cells:{}}}); box.append(el); ok('opération posée '+expr, el.querySelectorAll('.op-grid input').length>0); }
+    catch(e){ ok('opération posée '+expr,false,String(e&&e.message||e)); } });
+  setTimeout(()=>box.remove(),500);
+  ok('éditeur de formules MathLive chargé',!!MFE,'MathLive ne s’est pas chargé');
+  ok('enregistrement dans le navigateur',canStore);
+  return res;
+}
+function showSelfTest(){
+  const res=runSelfTest(); const bad=res.filter(r=>!r.ok);
+  const d=document.getElementById('helpBody');
+  d.innerHTML='<h3>Auto-test : '+(res.length-bad.length)+' / '+res.length+' réussis</h3><table>'+res.map(r=>'<tr><td>'+(r.ok?'✅':'❌')+' '+r.name+'</td><td>'+(r.ok?'':r.detail)+'</td></tr>').join('')+'</table>';
+  document.getElementById('helpDlg').classList.add('open');
+  return res;
+}
+window.MathDysTest=runSelfTest;
+
 /* ============ Démarrage ============ */
 applySettings(); renderTools(); renderPage();
 refreshFileStatus();
-const start=()=>{ const R=page().rows; focusRow(R[R.length-1].id,'end'); if(!state.seenHelp) openDlg('helpDlg'); };
+const start=()=>{ const R=page().rows; focusRow(R[R.length-1].id,'end'); if(location.hash==='#test') setTimeout(showSelfTest,600); else if(!state.seenHelp) openDlg('helpDlg'); };
 if(window.customElements && customElements.whenDefined && MFE){ customElements.whenDefined('math-field').then(()=>setTimeout(start,150)); } else start();
 if(document.fonts && document.fonts.ready) document.fonts.ready.then(()=>setTimeout(alignAll,50));
 })();

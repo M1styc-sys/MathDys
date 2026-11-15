@@ -1,9 +1,9 @@
-# MathDys - cahier de maths pour les élèves multi-dys
+# MathDys — cahier de maths pour les élèves multi-dys
 
 MathDys est un cahier de mathématiques en ligne pour prendre des notes **vite, au clavier, sans souris**.
 Il est pensé pour les élèves dyspraxiques, dyslexiques et dyscalculiques, de la primaire au lycée.
 
- **Utiliser MathDys : https://m1styc-sys.github.io/MathDys/**
+👉 **Utiliser MathDys : https://m1styc-sys.github.io/MathDys/**
 
 ## Ce qu'il sait faire
 
@@ -27,6 +27,14 @@ Il est pensé pour les élèves dyspraxiques, dyslexiques et dyscalculiques, de 
 
 **Rendre son travail**
 - **Imprimer ou enregistrer en PDF** une copie propre (Ctrl+P)
+- **Exporter pour Word ou LibreOffice**, ou copier en texte lisible
+
+**Pour les professeurs**
+- **Fiches d'exercices** : des lignes d'énoncé protégées que l'élève complète, sans pouvoir écraser la fiche
+
+**Confort**
+- **Mode simple**, **Annuler / Rétablir** pour tout le cahier, **déplacer les blocs**, **clavier de maths à l'écran** pour les tablettes
+- Conçu pour être utilisable **au clavier seul** et avec un **lecteur d'écran**
 
 Toute l'aide est dans le logiciel : touche **F1**. Les nouveautés sont dans [CHANGELOG.md](CHANGELOG.md).
 
@@ -46,11 +54,16 @@ Dans Chrome ou Edge, vous pouvez aussi **l'installer comme une application** (ic
 Écrivez à **git.public@protonmail.com** ou ouvrez une *Issue* sur ce dépôt.
 Pour un bug, indiquez ce que vous faisiez, ce qui s'est passé et votre navigateur.
 
+## Vérifier que tout marche
+
+Ajoutez `#test` à la fin de l'adresse (https://m1styc-sys.github.io/MathDys/#test) : MathDys lance un auto-test et affiche ce qui fonctionne.
+
+## Licence
+
+MathDys est un **logiciel libre** distribué sous licence **GNU GPL v3** (voir le fichier [LICENSE](LICENSE)).
+Vous pouvez l'utiliser, l'étudier, le modifier et le partager librement. Si vous distribuez une version modifiée, elle doit rester libre, sous la même licence, avec son code source.
+
 ## Technique
 
 Une simple page web : `index.html`, `style.css` et `app.js`, plus `sw.js` et `manifest.webmanifest` pour le mode hors ligne. Pas d'installation, pas de serveur.
 L'éditeur de formules est [MathLive](https://cortexjs.io/mathlive/) (licence MIT).
-
-## Licence
-
-MathDys est un logiciel libre distribué sous licence GNU GPL v3 (voir le fichier LICENSE). Vous pouvez l'utiliser, l'étudier, le modifier et le partager librement. Si vous distribuez une version modifiée, elle doit rester libre, sous la même licence, avec son code source.

@@ -1,5 +1,15 @@
 # Nouveautés de MathDys
 
+## Version 0.4.0
+- **Annuler / Rétablir pour tout le cahier** (Ctrl+Z, Ctrl+Y, boutons ↶ ↷) : un bloc supprimé, déplacé ou transformé se récupère.
+- **Mode simple** : seulement les boutons essentiels ; tout le reste est dans Ctrl+K. Activé par les réglages tout prêts.
+- **Déplacer un bloc** vers le haut ou le bas (Alt+↑ / Alt+↓, ou ▲▼).
+- **Clavier de maths à l'écran** pour les tablettes.
+- **Fiches d'exercices pour les professeurs** : lignes d'énoncé protégées (🔒) ; l'élève enregistre sa copie sans écraser la fiche.
+- **Export Word et LibreOffice** (menu Exporter…), et copie en texte lisible (x², √, ∞…).
+- **Accessibilité** : contrastes conformes aux normes (WCAG AA), libellés pour les lecteurs d'écran, focus visible au clavier.
+- **Fiabilité** : version de l'éditeur de formules figée, page d'auto-test (ajoute #test à la fin de l'adresse).
+
 ## Version 0.3.0
 - **Imprimer ou enregistrer en PDF** (Ctrl+P) : une copie propre avec ton nom, la date et le titre, sans les boutons.
 - **Images dans le cahier** : colle une capture de l'énoncé (Ctrl+V), glisse une photo sur la page ou choisis un fichier.

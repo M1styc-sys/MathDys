@@ -1,3 +1,9 @@
+# Range une copie de l'éditeur de formules MathLive dans le dépôt (dossier lib/mathlive/).
+# Ainsi, MathDys ne dépend d'aucun autre site : il marche même si jsDelivr est bloqué
+# par le réseau de l'établissement, et hors ligne dès la première visite.
+#
+# Pour le lancer : onglet « Actions » → « Installer l'éditeur de formules » → « Run workflow ».
+# Pour changer de version : modifier VERSION ci-dessous, ET la même version dans index.html.
 name: Installer l'éditeur de formules
 
 on:
@@ -18,7 +24,7 @@ jobs:
         with:
           node-version: 20
 
-      - name: Télécharger MathLive depuis npm
+      - name: Télécharger MathLive ${{ env.VERSION }} depuis npm
         run: |
           npm pack "mathlive@${VERSION}"
           tar -xzf "mathlive-${VERSION}.tgz"
@@ -28,7 +34,7 @@ jobs:
           cp package/dist/mathlive.min.js lib/mathlive/
           if [ -d package/dist/fonts ]; then cp -r package/dist/fonts lib/mathlive/fonts; fi
           cp package/LICENSE* lib/mathlive/ 2>/dev/null || true
-          echo "MathLive ${VERSION} — https://mathlive.io — licence MIT" > lib/mathlive/LISEZMOI.txt
+          echo "MathLive ${VERSION} — https://mathlive.io — licence MIT (voir le fichier LICENSE)." > lib/mathlive/LISEZMOI.txt
           rm -rf package "mathlive-${VERSION}.tgz"
           ls -la lib/mathlive
 

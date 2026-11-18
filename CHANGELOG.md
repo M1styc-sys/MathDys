@@ -1,5 +1,19 @@
 # Nouveautés de MathDys
 
+## Version 1.1.1 — version stable (corrections)
+- **Mode examen** : le bandeau rouge restait affiché en permanence, même hors examen ou après en être sorti, avec un bouton « Quitter » sans effet. Corrigé.
+- **Mode examen** : impossible désormais d'en sortir en ouvrant un fichier depuis l'ordinateur ; le bouton « Vérifier » des additions et soustractions est bien coupé ; si le code du professeur est perdu, il n'est plus demandé 4 h après le début ; le cadre rouge ne disparaît plus quand on change un réglage.
+- **Mises à jour** : le navigateur pouvait mélanger l'ancienne page et le nouveau code, et MathDys démarrait à moitié. Maintenant les deux sont toujours de la même version, et MathDys se répare tout seul si besoin (bouton « Réparer et recharger » en dernier recours ; les cahiers ne sont jamais touchés).
+- **Données** : ouvrir un fichier pouvait supprimer des pages vides du cahier ; rouvrir un fichier déjà ouvert pouvait écraser des modifications non enregistrées. Corrigé : rien n'est plus jamais effacé sans le demander.
+- **Données** : un cahier abîmé (fichier modifié à la main, ancienne version) est réparé au lieu de faire planter MathDys.
+- Changer de page n'affiche plus à tort « pas encore enregistré ».
+- Ctrl+Entrée deux fois de suite n'écrit plus « = 7 = 7 ».
+- Une ligne d'énoncé ne peut plus être déplacée en déplaçant sa voisine ; elle est protégée dès son affichage.
+- Un zoom extrême sur un graphique ne peut plus figer la page.
+- Arbres : les probabilités des branches retirées sont effacées ; en mode examen, plus d'indication sur la somme des branches.
+- Plus d'erreur au chargement liée au dossier `lib/` (l'éditeur de formules est chargé directement, en version figée).
+- Messages du mode examen corrigés (« Désactivé en mode examen : la calculatrice »).
+
 ## Version 1.1.0
 - **Mode examen** (Réglages → 🎓, ou Ctrl+K → « examen ») : coupe les aides qui donnent des réponses (vérification des étapes, aide-mémoire, abréviations, « Vérifier » des opérations, calculs automatiques des arbres et des tableaux), au choix la calculatrice et les graphiques, et l'accès aux autres pages et fichiers. Bandeau visible, heure de début imprimée sur la copie, code facultatif du professeur pour en sortir.
 - **Sauvegarder tout le cahier** en un seul fichier (Exporter… → 💾), et le restaurer avec 📂 Ouvrir, sans rien effacer. Petit rappel quand le cahier grandit.

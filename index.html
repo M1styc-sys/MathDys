@@ -12,12 +12,10 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Andika&family=Atkinson+Hyperlegible:wght@400;700&family=Lexend:wght@400;600&display=swap" rel="stylesheet">
-<!-- Éditeur de formules MathLive 0.104.2 (version figée).
-     1) copie locale dans lib/ si elle existe (aucun service extérieur, marche hors ligne dès la 1re visite)
-     2) sinon, la même version depuis jsDelivr -->
-<script src="lib/mathlive.min.js"></script>
-<script>if(!window.MathfieldElement && !(window.MathLive && window.MathLive.MathfieldElement)) document.write('<script src="https://cdn.jsdelivr.net/npm/mathlive@0.104.2/dist/mathlive.min.js"><\/script>');</script>
-<link rel="stylesheet" href="style.css">
+<meta name="mathdys-version" content="1.1.1">
+<!-- Éditeur de formules MathLive 0.104.2 (version figée : une mise à jour de leur côté ne peut pas casser MathDys) -->
+<script src="https://cdn.jsdelivr.net/npm/mathlive@0.104.2/dist/mathlive.min.js"></script>
+<link rel="stylesheet" href="style.css?v=1.1.1">
 </head>
 <body>
 <div class="exambar" id="examBar" hidden role="status"><span class="ex-txt"></span><button class="btn" id="examQuit">Quitter le mode examen</button></div>
@@ -155,6 +153,6 @@
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 <div class="drop" id="drop">Lâche le fichier pour ouvrir le cahier</div>
 
-<script src="app.js"></script>
+<script src="app.js?v=1.1.1"></script>
 </body>
 </html>

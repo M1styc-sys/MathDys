@@ -26,8 +26,20 @@
 
   Voir CONTRIBUTING.md pour l'organisation du projet.
 */
+try{
 (function(){
 'use strict';
+const APP_VERSION='1.1.1';
+/* La page HTML et ce fichier doivent être de la même version. Si le navigateur a gardé un ancien fichier
+   en mémoire (cache), on recharge une fois les bons fichiers au lieu de démarrer à moitié. */
+(function checkVersion(){
+  const m=document.querySelector('meta[name="mathdys-version"]'); const html=m&&m.content;
+  if(!html || html===APP_VERSION){ try{ sessionStorage.removeItem('mathdys.reload'); }catch(e){} return; }
+  let tried=null; try{ tried=sessionStorage.getItem('mathdys.reload'); }catch(e){}
+  if(tried===html+'/'+APP_VERSION) return; // déjà essayé : on démarre quand même (plutôt que de boucler)
+  try{ sessionStorage.setItem('mathdys.reload',html+'/'+APP_VERSION); }catch(e){}
+  throw {mathdysReload:true};
+})();
 const MFE = window.MathfieldElement || (window.MathLive && window.MathLive.MathfieldElement);
 if(!MFE){ document.getElementById('loaderr').style.display='block'; }
 else{
@@ -41,6 +53,7 @@ else{
 /* ============ Catalogue des symboles ============
    [symbole affiché, nom (pour la recherche), modèle LaTeX, raccourci tapé, niveau min (0 primaire, 1 collège, 2 lycée), mots-clés]
    #? = case à remplir, #@ = ce qui est juste avant le curseur */
+const on=(id,ev,fn)=>{ const el=document.getElementById(id); if(el) el.addEventListener(ev,fn); return el; };
 const LV={primaire:0,college:1,lycee:2};
 const SYS2='\\begin{cases}#?\\\\#?\\end{cases}';
 const SYS3='\\begin{cases}#?\\\\#?\\\\#?\\end{cases}';
@@ -236,8 +249,24 @@ function load(){
   catch(e){ canStore=false; }
   return null;
 }
-let state = load() || defaults();
-state.settings = Object.assign(defaults().settings, state.settings||{});
+// remet en ordre un cahier abîmé (fichier modifié à la main, ancienne version…) au lieu de planter
+const BLOCK_TYPES=['math','text','op','graph','tree','img','tab'];
+function cleanRows(rows){ const out=(Array.isArray(rows)?rows:[]).filter(r=>r&&typeof r==='object'&&BLOCK_TYPES.includes(r.type))
+    .map(r=>{ const x=Object.assign({},r); if(!x.id||typeof x.id!=='string') x.id=uid();
+      if((x.type==='math'||x.type==='text') && typeof x.value!=='string') x.value='';
+      if(x.type!=='math'&&x.type!=='text'&&(!x.value||typeof x.value!=='object')) delete x.value; return x; });
+  const seen=new Set(); out.forEach(r=>{ if(seen.has(r.id)) r.id=uid(); seen.add(r.id); });
+  if(!out.length) out.push({id:uid(),type:'math',value:''}); return out; }
+function sanitize(st){
+  if(!st||typeof st!=='object') return defaults();
+  st.pages=(Array.isArray(st.pages)?st.pages:[]).filter(p=>p&&typeof p==='object').map(p=>{ if(!p.id) p.id=uid(); p.rows=cleanRows(p.rows); if(typeof p.title!=='string') p.title=''; return p; });
+  if(!st.pages.length){ const d=defaults(); st.pages=d.pages; st.current=d.current; }
+  if(!st.pages.some(p=>p.id===st.current)) st.current=st.pages[0].id;
+  st.settings=Object.assign(defaults().settings, (st.settings&&typeof st.settings==='object')?st.settings:{});
+  if(st.settings.exam && !st.pages.some(p=>p.id===st.settings.exam.page)) st.settings.exam.page=st.current;
+  return st;
+}
+let state = sanitize(load() || defaults());
 let saveTimer=null;
 function scheduleSave(dirty){ if(dirty!==false){ const p=page(); if(p) p.dirty=true; noteChange(); } clearTimeout(saveTimer); saveTimer=setTimeout(save,400); refreshFileStatus(); }
 function save(){
@@ -317,9 +346,9 @@ function makeRowEl(row){
   del.addEventListener('mousedown',e=>e.preventDefault());
   del.addEventListener('click',()=>deleteRow(row.id));
   if(row.locked && !state.settings.teacher){ // ligne d'énoncé : l'élève peut la lire, pas la modifier
-    requestAnimationFrame(()=>{ const mf=body.querySelector('math-field'); if(mf){ mf.readOnly=true; mf.setAttribute('read-only',''); }
+    el._lock=()=>{ const mf=body.querySelector('math-field'); if(mf){ mf.setAttribute('read-only',''); try{ mf.readOnly=true; }catch(e){} }
       const tx=body.querySelector('.txt'); if(tx) tx.contentEditable='false';
-      if(row.type!=='math'&&row.type!=='text'&&row.type!=='img') body.inert=true; });
+      if(row.type!=='math'&&row.type!=='text'&&row.type!=='img') body.inert=true; };
     del.style.visibility='hidden';
   }
   const mv=document.createElement('div'); mv.className='rmove';
@@ -462,7 +491,7 @@ function drawOp(row,grid,side,msg){
     if(c.k==='comma') d.textContent=',';
     else if(c.k!=='sign'){ d.append(cellInput(row,'res',c.place)); }
   });
-  if(state.settings.check){
+  if(state.settings.check && !isExam()){
     const b=document.createElement('button'); b.className='btn'; b.textContent='Vérifier';
     b.addEventListener('click',()=>checkOp(row,grid,p,D,msg));
     side.append(b);
@@ -698,6 +727,7 @@ function buildGraph(row,body){
   B('Zoom +','Zoomer',()=>zoom(0.7)); B('Zoom −','Dézoomer',()=>zoom(1/0.7));
   B('Repère normal','Revenir à la vue de départ',()=>{ V.view={xmin:-10,xmax:10,ymin:-7,ymax:7}; fitAspect(); draw(); scheduleSave(); });
   function zoom(f,cx,cy){ const v=V.view; cx=cx??(v.xmin+v.xmax)/2; cy=cy??(v.ymin+v.ymax)/2;
+    const w=(v.xmax-v.xmin)*f; if(w<1e-4||w>1e7){ toast(w<1e-4?'Zoom maximum atteint':'Zoom minimum atteint'); return; }
     v.xmin=cx-(cx-v.xmin)*f; v.xmax=cx+(v.xmax-cx)*f; v.ymin=cy-(cy-v.ymin)*f; v.ymax=cy+(v.ymax-cy)*f; draw(); scheduleSave(); }
   function fitAspect(){ const r=cv.getBoundingClientRect(); if(!r.width) return; const v=V.view; const cy=(v.ymin+v.ymax)/2; const h=(v.xmax-v.xmin)*r.height/r.width; v.ymin=cy-h/2; v.ymax=cy+h/2; }
   // déplacer à la souris / au doigt, zoomer à la molette
@@ -720,7 +750,8 @@ function buildGraph(row,body){
     const ink=cs.getPropertyValue('--ink').trim()||'#222', line=cs.getPropertyValue('--line').trim()||'#ddd', muted=cs.getPropertyValue('--muted').trim()||'#888';
     const X=x=>(x-v.xmin)/(v.xmax-v.xmin)*W, Y=y=>(v.ymax-y)/(v.ymax-v.ymin)*H;
     c.clearRect(0,0,W,H);
-    const sx=niceStep(v.xmax-v.xmin,W), sy=niceStep(v.ymax-v.ymin,H);
+    if(!(v.xmax>v.xmin) || !(v.ymax>v.ymin) || !isFinite(v.xmax-v.xmin) || !isFinite(v.ymax-v.ymin)){ V.view={xmin:-10,xmax:10,ymin:-7,ymax:7}; return draw(); }
+    const sx=niceStep(v.xmax-v.xmin,W), sy=niceStep(v.ymax-v.ymin,H); if(!(sx>0)||!(sy>0)) return;
     c.lineWidth=1; c.strokeStyle=line; c.beginPath();
     for(let x=Math.ceil(v.xmin/sx)*sx;x<=v.xmax;x+=sx){ c.moveTo(Math.round(X(x))+.5,0); c.lineTo(Math.round(X(x))+.5,H); }
     for(let y=Math.ceil(v.ymin/sy)*sy;y<=v.ymax;y+=sy){ c.moveTo(0,Math.round(Y(y))+.5); c.lineTo(W,Math.round(Y(y))+.5); }
@@ -784,7 +815,8 @@ function buildTree(row,body){
     if(V.levels[L].length===2 && i===1){ const a=prettyEv(V.levels[L][0]); if(a) return barOf(a); } return '?'; };
   let probInputs=[], labels=[], prods=[];
   function changed(){ scheduleSave(); update(); }
-  function rebuild(){ buildHead(); layout(); update(); scheduleSave(); }
+  function prune(){ Object.keys(V.p).forEach(path=>{ const ok=path.split('-').every((x,L)=>L<V.levels.length && +x<V.levels[L].length); if(!ok) delete V.p[path]; }); }
+  function rebuild(){ prune(); buildHead(); layout(); update(); scheduleSave(); }
   function buildHead(){
     head.innerHTML='';
     V.levels.forEach((lev,L)=>{
@@ -859,7 +891,7 @@ function buildTree(row,body){
       if(vals.some(v=>v!==null&&(isNaN(v)||v<0||v>1))){ ins.forEach((i,k)=>{ const v=vals[k]; if(v!==null&&(isNaN(v)||v<0||v>1)) i.classList.add('bad'); }); problems.push('Une probabilité doit être un nombre entre 0 et 1 (ex : 0,3 ou 3/10 ou 30 %).'); return; }
       const empty=ins.filter((i,k)=>vals[k]===null); const sum=vals.reduce((a,v)=>a+(v||0),0);
       if(empty.length===1 && sum<=1+1e-9 && !isExam()){ const r=Math.round((1-sum)*1e9)/1e9; empty[0].placeholder=fmtP(r); empty[0].dataset.auto=r; }
-      if(!empty.length && Math.abs(sum-1)>1e-9){ ins.forEach(i=>i.classList.add('bad'));
+      if(!empty.length && Math.abs(sum-1)>1e-9 && !isExam()){ ins.forEach(i=>i.classList.add('bad'));
         const where= par==='root' ? 'au départ' : 'après '+par.split('-').map((x,L)=>evName(L,+x)).join(' puis ');
         problems.push('Les branches '+where+' font '+fmtP(sum)+' au total au lieu de 1.'); }
     });
@@ -1060,7 +1092,7 @@ async function addImage(file,afterId){
   try{
     const src=await readImage(file);
     const r=afterId&&rowById(afterId);
-    if(r && r.type==='img' && !r.value.src){ r.value.src=src; const old=els.get(r.id); const el=makeRowEl(r); old.replaceWith(el); els.set(r.id,el); setCurrent(r.id); scheduleSave(); }
+    if(r && r.type==='img' && !r.value.src){ r.value.src=src; remountRow(r.id); setCurrent(r.id); scheduleSave(); }
     else addRowAfter(afterId||currentId,'img',{src,w:100});
     if(src.length>1.5e6) toast('Grande image : ton fichier .mathdys sera plus lourd');
   }catch(e){ toast('Impossible de lire cette image'); }
@@ -1077,10 +1109,18 @@ function mount(row, afterEl){
   el.setAttribute('role','listitem'); el.setAttribute('aria-label',(BLOCKS[row.type]||BLOCKS.math).label+(row.locked?' (énoncé)':''));
   ariaFix(el);
   el.querySelectorAll('math-field').forEach(mf=>{ if(mf._setup) mf._setup(); });
+  if(el._lock) el._lock();
   if(el._afterMount) el._afterMount();
   return el;
 }
+// reconstruit une ligne sur place (changement de type, verrou, image ajoutée) avec tous ses réglages
+function remountRow(id){ const r=rowById(id), old=els.get(id); if(!r||!old) return null;
+  const el=makeRowEl(r); old.replaceWith(el); els.set(id,el);
+  el.setAttribute('role','listitem'); el.setAttribute('aria-label',(BLOCKS[r.type]||BLOCKS.math).label+(r.locked?' (énoncé)':'')); ariaFix(el);
+  el.querySelectorAll('math-field').forEach(mf=>{ if(mf._setup) mf._setup(); }); if(el._lock) el._lock(); if(el._afterMount) el._afterMount();
+  return el; }
 function renderPage(){
+  currentId=null;
   if(HIST.pid!==state.current){ HIST.undo=[]; HIST.redo=[]; HIST.pid=state.current; HIST.burst=false; }
   paper.innerHTML=''; els.clear();
   page().rows.forEach(r=>mount(r,null));
@@ -1121,7 +1161,7 @@ function setCurrent(id){
 function addRowAfter(id,type,value){
   if((type==='graph'&&examCut('graph'))||(type==='img'&&isExam())){ examRefused(type==='img'?'L\u2019ajout d\u2019image':'Le graphique'); return null; }
   beforeStructural();
-  const R=page().rows; const i=id?idx(id):R.length-1;
+  const R=page().rows; let i=id?idx(id):-1; if(i<0){ i=R.length-1; id=R.length?R[R.length-1].id:null; }
   const row={id:uid(),type,value: value!==undefined?value:(type==='op'?{expr:'',res:{},ret:{}}:type==='graph'?{fns:[''],view:null}:type==='tree'?{levels:[['A',''],['B','']],p:{},prod:true}:type==='tab'?newTab('var'):type==='img'?{src:'',w:100}:'')};
   R.splice(i+1,0,row);
   mount(row, id?els.get(id):paper.lastElementChild);
@@ -1155,13 +1195,11 @@ function deleteRow(id){
 }
 function toggleLock(id){
   const r=rowById(id); if(!r) return; beforeStructural(); r.locked=!r.locked; if(!r.locked) delete r.locked;
-  const old=els.get(id); const el=makeRowEl(r); old.replaceWith(el); els.set(id,el);
-  el.querySelectorAll('math-field').forEach(m=>m._setup&&m._setup()); if(el._afterMount) el._afterMount();
-  setCurrent(id); scheduleSave(); toast(r.locked?'Ligne d\u2019énoncé : l\u2019élève ne pourra pas la modifier':'Ligne libérée');
+  remountRow(id); setCurrent(id); scheduleSave(); toast(r.locked?'Ligne d\u2019énoncé : l\u2019élève ne pourra pas la modifier':'Ligne libérée');
 }
 function moveRow(id,dir){
-  { const r=rowById(id); if(r&&r.locked&&!state.settings.teacher){ toast('Les lignes d\u2019énoncé ne se déplacent pas'); return; } }
   const R=page().rows; const i=idx(id), j=i+dir; if(i<0||j<0||j>=R.length) return;
+  if((R[i].locked||R[j].locked) && !state.settings.teacher){ toast('Les lignes d\u2019énoncé ne se déplacent pas'); return; }
   beforeStructural();
   [R[i],R[j]]=[R[j],R[i]];
   const el=els.get(id), other=els.get(R[i].id);
@@ -1175,10 +1213,10 @@ function toggleType(id){
   beforeStructural();
   r.type = r.type==='math'?'text':'math';
   if(typeof r.value!=='string') r.value='';
-  const old=els.get(id); const el=makeRowEl(r); old.replaceWith(el); els.set(id,el);
-  const mf=el.querySelector('math-field'); if(mf&&mf._setup) mf._setup();
+  remountRow(id);
   focusRow(id,'end'); scheduleSave(); scheduleAlign();
 }
+const isPristine=p=>!!p && !p.dirty && !p.fileName && !p.exam && !p.subject && p.rows.every(r=>isEmpty(r));
 function isEmpty(r){ return r.type==='op' ? !(r.value&&r.value.expr) : (r.type==='math'||r.type==='text') ? !r.value : false; }
 
 /* ---------- Calculatrice intégrée (Ctrl+Entrée) ---------- */
@@ -1195,7 +1233,7 @@ function braceify(src){
     const c=s[i];
     if(c==='\\'){ let j=i+1; while(j<s.length&&/[a-zA-Z]/.test(s[j])) j++; const name=s.slice(i+1,j);
       if(ARGS[name]){ out+='\\'+name; i=j;
-        if(name==='sqrt'){ while(s[i]===' ') i++; if(s[i]==='['){ const k=s.indexOf(']',i); out+=s.slice(i,k+1); i=k+1; } }
+        if(name==='sqrt'){ while(s[i]===' ') i++; if(s[i]==='['){ const k=s.indexOf(']',i); if(k<0){ out+=s.slice(i); i=s.length; continue; } out+=s.slice(i,k+1); i=k+1; } }
         for(let n=0;n<ARGS[name];n++) out+=readArg(); continue; }
       if(j===i+1){ out+=s.slice(i,i+2); i+=2; continue; }
       out+=s.slice(i,j); i=j; continue; }
@@ -1278,8 +1316,11 @@ function compute(id){
   if(examCut('calc')) return examRefused('La calculatrice');
   const el=els.get(id); const mf=el&&el.querySelector('math-field'); if(!mf) return;
   const msg=el.querySelector('.calcmsg');
-  let latex=mf.value.replace(/\s*=\s*(\\placeholder\{\})?\s*\??\s*$/,'');
-  const parts=splitTopEq(latex); const target=parts[parts.length-1];
+  let latex=mf.value.replace(/\s*=\s*(\\placeholder\{\})?\s*\??\s*$/,'').replace(/\\approx[^=]*$/,'');
+  let parts=splitTopEq(latex);
+  if(parts.length>1){ const a=evalLatex(parts[parts.length-2]), b=evalLatex(parts[parts.length-1]);
+    if(a!==null && b!==null && Math.abs(a-b)<1e-9*Math.max(1,Math.abs(a))){ toast('C\u2019est déjà calculé'); return; } }
+  const target=parts[parts.length-1];
   const v=evalLatex(target);
   if(v===null){ msg.textContent='Je ne sais calculer que des nombres (pas de lettres) : par ex. 3\u00d74+\u00bd.'; return; }
   const f=formatResult(v,target);
@@ -1307,7 +1348,7 @@ function alignAll(){
     if(group.length>=2){
       const offs=group.map(g=>({mf:g, o:eqOffset(g)}));
       const valid=offs.filter(x=>x.o!==null);
-      const max=Math.max(...valid.map(x=>x.o));
+      const max=valid.length?Math.max(...valid.map(x=>x.o)):0;
       offs.forEach(x=>{ x.mf.style.marginLeft = (x.o===null?0:Math.max(0,max-x.o))+'px'; });
     } else group.forEach(g=>g.style.marginLeft='0px');
     group=[];
@@ -1500,7 +1541,7 @@ const PRESETS={
   dyscalculie:{simple:true,digits:true,fs:22,lh:1.8,font:"'Atkinson Hyperlegible', Arial, sans-serif",theme:'creme',align:true,labels:true,check:true,focus:false,parens:true,rate:0.85},
 };
 function applyPreset(name){
-  Object.assign(state.settings,PRESETS[name]); applySettings(); syncSettingsUI(); colorAllParens(); renderTools(); scheduleSave(false);
+  Object.assign(state.settings,PRESETS[name]); applySettings(); syncSettingsUI(); renderTools(); renderPage(); colorAllParens(); scheduleSave(false);
   toast('Réglages « '+({defaut:'par défaut',dyspraxie:'dyspraxie',dyslexie:'dyslexie',dyscalculie:'dyscalculie'}[name])+' » appliqués — tu peux encore les ajuster');
 }
 
@@ -1621,7 +1662,7 @@ function toggleSimple(){ state.settings.simple=!state.settings.simple; renderToo
 let curCat=null;
 function renderCats(){
   const cats=document.getElementById('cats'); cats.innerHTML='';
-  const avail=CATALOG.filter(c=>c.items.some(a=>a[4]<=LV[state.settings.level]));
+  const avail=CATALOG.filter(c=>c.items.some(a=>a[4]<=LV[state.settings.level]) && !(isExam()&&c.cat==='Formules'));
   if(!avail.find(c=>c.cat===curCat)) curCat=avail[0]&&avail[0].cat;
   avail.forEach(c=>{ const b=document.createElement('button'); b.className='cat'+(c.cat===curCat?' on':''); b.textContent=c.cat;
     b.addEventListener('mousedown',e=>e.preventDefault());
@@ -1693,8 +1734,8 @@ function pickSearch(i){
   insertTpl(s.tpl);
   if(s.key && !NATIVE.has(s.key)) toast('Astuce : la prochaine fois, tape « '+s.key+' »');
 }
-document.getElementById('srchIn').addEventListener('input',doSearch);
-document.getElementById('srchIn').addEventListener('keydown',e=>{
+on('srchIn','input',doSearch);
+on('srchIn','keydown',e=>{
   if(e.key==='ArrowDown'){ e.preventDefault(); srchSel=Math.min(srchSel+1,srchRes.length-1); paintSearch(); }
   else if(e.key==='ArrowUp'){ e.preventDefault(); srchSel=Math.max(srchSel-1,0); paintSearch(); }
   else if(e.key==='Enter'){ e.preventDefault(); pickSearch(srchSel); }
@@ -1816,17 +1857,17 @@ function ask(text,cb,opt){ document.getElementById('askText').textContent=text; 
   const dl=document.getElementById('askList'); dl.innerHTML=''; (opt&&opt.list||[]).forEach(v=>{ const o=document.createElement('option'); o.value=v; dl.append(o); });
   document.getElementById('askOk').textContent=opt&&opt.ok||'Oui';
   openDlg('askDlg'); if(opt&&opt.input){ inp.focus(); inp.select(); } }
-document.getElementById('askIn').addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); document.getElementById('askOk').click(); } });
-document.getElementById('askOk').addEventListener('click',()=>{ document.getElementById('askDlg').classList.remove('open'); const v=document.getElementById('askIn').value; if(askCb) askCb(v); askCb=null; });
+on('askIn','keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); document.getElementById('askOk').click(); } });
+on('askOk','click',()=>{ document.getElementById('askDlg').classList.remove('open'); const v=document.getElementById('askIn').value; if(askCb) askCb(v); askCb=null; });
 
 function applySettings(){
   const s=state.settings, r=document.documentElement.style;
   r.setProperty('--fs',s.fs+'px'); r.setProperty('--lh',s.lh); r.setProperty('--font',s.font);
-  document.body.className='theme-'+s.theme+(s.focus?' focusmode':'')+(vkbOn()?' vkb':'');
+  document.body.className='theme-'+s.theme+(s.focus?' focusmode':'')+(vkbOn()?' vkb':'')+(isExam()?' exam':'');
   const fb=document.getElementById('focusBtn'); if(fb) fb.classList.toggle('primary',!!s.focus);
   document.getElementById('levelSel').value=s.level;
   scheduleAlign();
-  requestAnimationFrame(()=>{ document.querySelectorAll('.graph').forEach(g=>g._draw&&g._draw()); document.querySelectorAll('.tree').forEach(t=>t._relayout&&t._relayout()); });
+  requestAnimationFrame(()=>{ document.querySelectorAll('.graph,.tree,.tabblk').forEach(b=>{ if(b._draw) b._draw(); if(b._relayout) b._relayout(); }); });
 }
 const BOUND=[];
 function syncSettingsUI(){ BOUND.forEach(([el,key])=>{ if(el.type==='checkbox') el.checked=!!state.settings[key]; else el.value=state.settings[key]??''; }); }
@@ -1836,23 +1877,23 @@ const bind=(id,key,conv,ev)=>{ const el=document.getElementById(id); BOUND.push(
   el.addEventListener(ev||'input',()=>{ state.settings[key]= el.type==='checkbox'?el.checked:conv(el.value); applySettings(); if(key==='labels'||key==='check') renderPage(); if(key==='parens') colorAllParens(); if(key==='simple') renderTools(); if(key==='vkb'||key==='teacher'||key==='abbr') renderPage(); if(key==='digits') colorAllParens(); if(key==='teacher') toast(state.settings.teacher?'Mode professeur : survole une ligne et clique sur 🔓 pour la protéger':'Mode professeur désactivé'); scheduleSave(false); }); };
 bind('sFs','fs',Number); bind('sLh','lh',Number); bind('sFont','font',String,'change'); bind('sTheme','theme',String,'change');
 bind('sName','name',String); bind('sFocus','focus',Boolean,'change'); bind('sParens','parens',Boolean,'change'); bind('sRate','rate',Number); bind('sSimple','simple',Boolean,'change'); bind('sAbbr','abbr',String,'change'); bind('sDigits','digits',Boolean,'change'); bind('sTeacher','teacher',Boolean,'change'); bind('sVkb','vkb',String,'change'); bind('sAlign','align',Boolean,'change'); bind('sLabels','labels',Boolean,'change'); bind('sCheck','check',Boolean,'change');
-document.getElementById('levelSel').addEventListener('change',e=>{ state.settings.level=e.target.value; renderTools(); scheduleSave(false); toast('Niveau : '+e.target.selectedOptions[0].textContent); });
-document.getElementById('settingsBtn').addEventListener('click',()=>openDlg('setDlg'));
-document.getElementById('helpBtn').addEventListener('click',()=>openDlg('helpDlg'));
-document.getElementById('newPage').addEventListener('click',()=>{ const p=newPage(); if(page()&&page().subject) p.subject=page().subject; state.pages.push(p); state.current=p.id; renderPage(); scheduleSave(); focusRow(p.rows[0].id,'end'); });
-document.getElementById('pageSel').addEventListener('change',e=>{
+on('levelSel','change',e=>{ state.settings.level=e.target.value; renderTools(); scheduleSave(false); toast('Niveau : '+e.target.selectedOptions[0].textContent); });
+on('settingsBtn','click',()=>openDlg('setDlg'));
+on('helpBtn','click',()=>openDlg('helpDlg'));
+on('newPage','click',()=>{ const p=newPage(); if(page()&&page().subject) p.subject=page().subject; state.pages.push(p); state.current=p.id; renderPage(); scheduleSave(false); focusRow(p.rows[0].id,'end'); });
+on('pageSel','change',e=>{
   const v=e.target.value;
   if(v==='__subj'){ e.target.value=state.current;
     ask('Dans quelle matière ranger « '+(page().title||'Sans titre')+' » ?',val=>{ page().subject=(val||'').trim().slice(0,40)||undefined; renderPageList(); scheduleSave(); },
       {input:true,value:page().subject||'',placeholder:'Maths, Physique, Chapitre 3…',list:subjects(),ok:'Ranger'});
     return; }
   if(v==='__del'){ e.target.value=state.current;
-    ask('Supprimer la page « '+(page().title||'Sans titre')+' » ?',()=>{ state.pages=state.pages.filter(p=>p.id!==state.current); if(!state.pages.length) state.pages.push(newPage()); state.current=state.pages[0].id; renderPage(); scheduleSave(); });
+    ask('Supprimer la page « '+(page().title||'Sans titre')+' » ?',()=>{ state.pages=state.pages.filter(p=>p.id!==state.current); if(!state.pages.length) state.pages.push(newPage()); state.current=state.pages[0].id; renderPage(); scheduleSave(false); });
     return; }
-  state.current=v; renderPage(); scheduleSave();
+  state.current=v; renderPage(); scheduleSave(false);
 });
-document.getElementById('pageTitle').addEventListener('input',e=>{ page().title=e.target.value; const o=document.querySelector('#pageSel option[value="'+state.current+'"]'); if(o) o.textContent=e.target.value||'Sans titre'; scheduleSave(); });
-document.getElementById('pageTitle').addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); const r=page().rows[0]; if(r) focusRow(r.id,'end'); } });
+on('pageTitle','input',e=>{ page().title=e.target.value; const o=document.querySelector('#pageSel option[value="'+state.current+'"]'); if(o) o.textContent=e.target.value||'Sans titre'; scheduleSave(); });
+on('pageTitle','keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); const r=page().rows[0]; if(r) focusRow(r.id,'end'); } });
 function preparePrint(){
   const ph=document.getElementById('printhead');
   const d=new Date().toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
@@ -1866,7 +1907,7 @@ function preparePrint(){
 }
 window.addEventListener('beforeprint',preparePrint);
 function doPrint(){ preparePrint(); try{ window.print(); }catch(e){ toast('Impression impossible ici'); } }
-document.getElementById('printBtn').addEventListener('click',doPrint);
+on('printBtn','click',doPrint);
 /* ============ Export : texte lisible, LaTeX, Word / LibreOffice ============ */
 const SUP={'0':'⁰','1':'¹','2':'²','3':'³','4':'⁴','5':'⁵','6':'⁶','7':'⁷','8':'⁸','9':'⁹','+':'⁺','-':'⁻','n':'ⁿ','x':'ˣ','i':'ⁱ'};
 const SUB={'0':'₀','1':'₁','2':'₂','3':'₃','4':'₄','5':'₅','6':'₆','7':'₇','8':'₈','9':'₉','+':'₊','-':'₋','n':'ₙ','k':'ₖ','p':'ₚ','i':'ᵢ'};
@@ -1950,7 +1991,7 @@ function exportDoc(mathml){
   document.body.append(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(url),3000);
   toast(mathml?'Fichier Word créé : les formules deviennent des équations Word':'Fichier créé : les formules sont écrites en texte simple');
 }
-document.getElementById('exportSel').addEventListener('change',e=>{
+on('exportSel','change',e=>{
   const v=e.target.value; e.target.value='';
   if(v==='txt') copyPage(false); else if(v==='latex') copyPage(true);
   else if(v==='all') saveAll();
@@ -2001,10 +2042,10 @@ function restoreAll(d,name){
   const fresh=list.filter(p=>!state.pages.some(q=>same(q,p)));
   if(!fresh.length){ toast('Toutes les pages de cette sauvegarde sont déjà dans ton cahier'); return; }
   ask('Ajouter '+fresh.length+' page'+(fresh.length>1?'s':'')+' de la sauvegarde « '+name+' » ? Tes pages actuelles sont gardées : rien n\u2019est effacé.',()=>{
-    let first=null;
-    fresh.forEach(p=>{ const np={id:uid(),title:p.title||'Sans titre',subject:p.subject,rows:p.rows.filter(r=>r&&KNOWN.includes(r.type)).map(r=>Object.assign({},r,{id:uid()})),exam:p.exam};
-      if(!np.rows.length) np.rows.push({id:uid(),type:'math',value:''}); state.pages.push(np); if(!first) first=np; });
-    state.pages=state.pages.filter(q=>q.dirty || q.fileName || q.rows.some(r=>!isEmpty(r)) || fresh.length===0);
+    let first=null; const prev=page();
+    fresh.forEach(p=>{ const np={id:uid(),title:(typeof p.title==='string'&&p.title)||'Sans titre',subject:typeof p.subject==='string'?p.subject:undefined,rows:cleanRows(p.rows).map(r=>Object.assign({},r,{id:uid()})),exam:p.exam};
+      state.pages.push(np); if(!first) first=np; });
+    if(isPristine(prev)) state.pages=state.pages.filter(q=>q!==prev);
     state.current=first.id; renderPage(); save(); toast(fresh.length+' page'+(fresh.length>1?'s':'')+' restaurée'+(fresh.length>1?'s':''));
   },{ok:'Restaurer'});
 }
@@ -2021,10 +2062,13 @@ function loadFileText(txt,name,handle){
   let d=null; try{ d=JSON.parse(txt); }catch(e){}
   if(d && d.app==='MathDys' && d.kind==='backup' && Array.isArray(d.pages)){ if(isExam()) return examRefused('La restauration'); restoreAll(d,name); return; }
   if(!d || d.app!=='MathDys' || !Array.isArray(d.rows)){ toast('« '+name+' » n\u2019est pas un cahier MathDys'); return; }
-  const rows=d.rows.filter(r=>r&&KNOWN.includes(r.type)).map(r=>Object.assign({},r,{id:uid()}));
-  if(!rows.length) rows.push({id:uid(),type:'math',value:''});
-  const title=d.title||name.replace(/\.[^.]+$/,'');
+  if(isExam() && !pendingExam) return examRefused('L\u2019ouverture d\u2019un fichier');
+  const rows=cleanRows(d.rows).map(r=>Object.assign({},r,{id:uid()}));
+  const title=(typeof d.title==='string'&&d.title)||name.replace(/\.[^.]+$/,'');
+  const prev=page();
   let p=state.pages.find(q=>q.fileName===name);
+  let keptCopy=false;
+  if(p && p.dirty){ p=null; keptCopy=true; } // la version modifiée et pas encore enregistrée n'est jamais écrasée
   if(p){ p.title=title; p.rows=rows; }
   else { p={id:uid(),title,rows}; state.pages.push(p); }
   p.fileName=name; p.dirty=false; state.current=p.id; delete p.suggest;
@@ -2032,17 +2076,17 @@ function loadFileText(txt,name,handle){
   const fiche=rows.some(r=>r.locked) && !state.settings.teacher;
   if(fiche){ // fiche du professeur : on n'écrase jamais l'original, l'élève enregistre SA copie
     handles.delete(p.id); p.fileName=null; p.dirty=true; p.suggest=name.replace(/\.mathdys$/i,'')+' - mes réponses'+FILE_EXT; }
-  // retire la page vide de départ si elle n'a jamais servi
-  state.pages=state.pages.filter(q=>q===p || q.dirty || q.fileName || q.rows.some(r=>!isEmpty(r)));
+  // retire seulement la page vierge sur laquelle on était, si elle n'a jamais servi
+  if(prev!==p && isPristine(prev)) state.pages=state.pages.filter(q=>q!==prev);
   if(pendingExam && Date.now()-pendingExam.asked<10*60*1000){ finishExam(pendingExam,p); return; }
   pendingExam=null;
   renderPage(); save();
   if(fiche) toast('Fiche d\u2019exercice : l\u2019énoncé est protégé. Écris tes réponses, puis Ctrl+S pour enregistrer TA copie.','OK',()=>{});
-  else toast('« '+name+' » ouvert');
+  else toast(keptCopy?'« '+name+' » ouvert dans une nouvelle page (ta version modifiée est gardée)':'« '+name+' » ouvert');
 }
-document.getElementById('openBtn').addEventListener('click',openFile);
-document.getElementById('saveBtn').addEventListener('click',()=>saveFile(false));
-document.getElementById('fileIn').addEventListener('change',async e=>{ const f=e.target.files[0]; if(f) loadFileText(await f.text(), f.name, null); e.target.value=''; });
+on('openBtn','click',openFile);
+on('saveBtn','click',()=>saveFile(false));
+on('fileIn','change',async e=>{ const f=e.target.files[0]; if(f) loadFileText(await f.text(), f.name, null); e.target.value=''; });
 let dragN=0; const dropEl=document.getElementById('drop');
 const hasFiles=e=>e.dataTransfer && [...e.dataTransfer.types].includes('Files');
 window.addEventListener('dragenter',e=>{ if(hasFiles(e)){ dragN++; dropEl.classList.add('on'); } });
@@ -2052,7 +2096,7 @@ window.addEventListener('drop',async e=>{ if(!hasFiles(e)) return; e.preventDefa
   const fs=[...e.dataTransfer.files]; if(!fs.length) return;
   if(isExam()) return examRefused('Le glisser-déposer de fichiers');
   for(const f of fs){ if(/^image\//.test(f.type)) await addImage(f,currentId); else loadFileText(await f.text(), f.name, null); } });
-document.getElementById('imgIn').addEventListener('change',async e=>{ const f=e.target.files[0]; e.target.value=''; if(f) await addImage(f,imgTarget||currentId); imgTarget=null; });
+on('imgIn','change',async e=>{ const f=e.target.files[0]; e.target.value=''; if(f) await addImage(f,imgTarget||currentId); imgTarget=null; });
 // coller une capture d'écran n'importe où
 window.addEventListener('paste',async e=>{
   const items=[...(e.clipboardData&&e.clipboardData.items||[])]; const it=items.find(i=>i.kind==='file'&&/^image\//.test(i.type));
@@ -2077,7 +2121,7 @@ const isExam=()=>!!(state.settings.exam&&state.settings.exam.on);
 const examCut=what=>{ const x=EX(); if(!x||!x.on) return false; if(what==='calc') return !!x.calc; if(what==='graph') return !!x.graph; return true; };
 const hashCode=s=>{ let h=5381; for(const c of String(s)) h=((h<<5)+h+c.charCodeAt(0))|0; return String(h>>>0); };
 const hhmm=d=>new Date(d).toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'});
-function examRefused(what){ toast((what||'Cet outil')+' est désactivé en mode examen'); return true; }
+function examRefused(what){ toast('Désactivé en mode examen : '+(what||'cet outil').replace(/^./,c=>c.toLowerCase())+'.'); return true; }
 let pendingExam=null;
 function openExamDlg(){
   if(isExam()){ quitExam(); return; }
@@ -2100,13 +2144,15 @@ function quitExam(){
   const x=EX(); if(!x) return;
   const done=()=>{ const p=state.pages.find(q=>q.id===x.page); if(p&&p.exam) p.exam.end=new Date().toISOString();
     state.settings.exam=null; applyExam(); renderPage(); save(); toast('Mode examen terminé'); };
-  if(x.code) ask('Code du professeur pour quitter le mode examen :',v=>{ if(hashCode((v||'').trim())===x.code) done(); else toast('Code incorrect'); },{input:true,placeholder:'code',ok:'Quitter'});
+  const late = x.start && Date.now()-new Date(x.start)>4*3600e3; // code oublié : plus nécessaire 4 h après le début
+  if(x.code && !late) ask('Code du professeur pour quitter le mode examen (si le code est perdu, il n\u2019est plus demandé 4 h après le début) :',v=>{ if(hashCode((v||'').trim())===x.code) done(); else toast('Code incorrect'); },{input:true,placeholder:'code',ok:'Quitter'});
   else ask('Quitter le mode examen ? Les aides seront de nouveau disponibles.',done,{ok:'Quitter'});
 }
 function applyExam(){
   const on=isExam(), x=EX();
   document.body.classList.toggle('exam',on);
   const b=document.getElementById('examBar');
+  if(!b){ renderTools(); return; }
   if(on){ b.hidden=false; b.querySelector('.ex-txt').textContent='MODE EXAMEN — commencé à '+hhmm(x.start)+' · aides coupées'+(x.calc?' · calculatrice coupée':'')+(x.graph?' · graphiques coupés':''); }
   else b.hidden=true;
   ['pageSel','newPage','openBtn'].forEach(id=>{ const el=document.getElementById(id); if(el) el.disabled=on; });
@@ -2126,16 +2172,15 @@ function openBug(){
 }
 function bugMessage(){ return (document.getElementById('bugTxt').value.trim()||'(décris ici le problème)')+'\n\n-----\n'+bugInfo(); }
 function updBugMail(){ document.getElementById('bugMail').href='mailto:git.public@protonmail.com?subject='+encodeURIComponent('MathDys '+APP_VERSION+' — bug ou idée')+'&body='+encodeURIComponent(bugMessage().slice(0,1800)); }
-document.getElementById('bugBtn').addEventListener('click',openBug);
-document.getElementById('exStart').addEventListener('click',()=>startExam(false));
-document.getElementById('examOpen').addEventListener('click',()=>{ document.getElementById('setDlg').classList.remove('open'); openExamDlg(); });
-document.getElementById('exFile').addEventListener('click',()=>startExam(true));
-document.getElementById('examQuit').addEventListener('click',quitExam);
-document.getElementById('bugTxt').addEventListener('input',updBugMail);
-document.getElementById('bugCopy').addEventListener('click',async()=>{ try{ await navigator.clipboard.writeText(bugMessage()); toast('Message copié : colle-le dans un mail à git.public@protonmail.com'); }catch(e){ toast('Copie refusée par le navigateur'); } });
+on('bugBtn','click',openBug);
+on('exStart','click',()=>startExam(false));
+on('examOpen','click',()=>{ document.getElementById('setDlg').classList.remove('open'); openExamDlg(); });
+on('exFile','click',()=>startExam(true));
+on('examQuit','click',quitExam);
+on('bugTxt','input',updBugMail);
+on('bugCopy','click',async()=>{ try{ await navigator.clipboard.writeText(bugMessage()); toast('Message copié : colle-le dans un mail à git.public@protonmail.com'); }catch(e){ toast('Copie refusée par le navigateur'); } });
 
 /* ============ Hors ligne : installation comme une application ============ */
-const APP_VERSION='1.1.0';
 try{
   if('serviceWorker' in navigator && location.protocol==='https:' && window.self===window.top)
     navigator.serviceWorker.register('sw.js').catch(()=>{});
@@ -2174,6 +2219,13 @@ function runSelfTest(){
     eq('mode examen : abréviations coupées',Object.keys(userAbbr()).length,0);
     eq('mode examen : calculatrice coupée',examCut('calc'),true);
     state.settings.exam=before; }
+  // robustesse : cahier abîmé, versions, page vierge
+  { const st=sanitize({pages:[{title:3,rows:[{type:'inconnu'},null,{type:'math',value:5},{type:'op'}]}],current:'x',settings:null});
+    eq('cahier abîmé : réparé sans planter',st.pages.length===1 && st.pages[0].rows.length===2 && st.pages[0].rows[0].value==='' && st.current===st.pages[0].id,true); }
+  eq('page vierge reconnue',isPristine({rows:[{type:'math',value:''},{type:'text',value:''}]}),true);
+  eq('page d\u2019examen jamais considérée comme vierge',isPristine({exam:{start:1},rows:[{type:'math',value:''}]}),false);
+  { const m=document.querySelector('meta[name="mathdys-version"]'); eq('page et code de la même version',m&&m.content,APP_VERSION); }
+  { const b=document.getElementById('examBar'); eq('bandeau du mode examen réellement caché hors examen', isExam() || (b && getComputedStyle(b).display==='none'), true); }
   // alignement
   eq('découpage au signe =',splitTopEq('3x+2=8').length,2);
   // opérations posées
@@ -2215,9 +2267,29 @@ window.MathDysTest=runSelfTest;
 /* ============ Démarrage ============ */
 applySettings(); renderTools(); if(isExam()) applyExam(); renderPage();
 refreshFileStatus();
+window.__mathdysStarted=true;
 const backupReminder=()=>{ if(isExam()) return; const n=state.pages.filter(p=>p.rows.some(r=>!isEmpty(r))).length; const last=state.lastBackup?new Date(state.lastBackup):null;
   if(n>=5 && (!last || Date.now()-last>30*864e5)) setTimeout(()=>toast('Pense à faire une sauvegarde complète de ton cahier ('+n+' pages)','Sauvegarder',saveAll),4000); };
 const start=()=>{ const R=page().rows; focusRow(R[R.length-1].id,'end'); backupReminder(); if(location.hash==='#test') setTimeout(showSelfTest,600); else if(!state.seenHelp) openDlg('helpDlg'); };
 if(window.customElements && customElements.whenDefined && MFE){ customElements.whenDefined('math-field').then(()=>setTimeout(start,150)); } else start();
 if(document.fonts && document.fonts.ready) document.fonts.ready.then(()=>setTimeout(alignAll,50));
 })();
+}catch(err){ window.__mathdysError=err; }
+/* Filet de sécurité : si le démarrage a échoué, on le dit clairement et on propose de réparer (les cahiers ne sont jamais touchés) */
+(function watchdog(){
+  if(window.__mathdysStarted) return;
+  const err=window.__mathdysError;
+  const m=document.querySelector('meta[name="mathdys-version"]'); const v=m?m.content:'';
+  const hard=async()=>{
+    try{ const ks=await caches.keys(); await Promise.all(ks.map(k=>caches.delete(k))); }catch(e){}
+    try{ await Promise.all(['./','index.html','app.js?v='+v,'style.css?v='+v,'app.js','style.css','sw.js'].map(u=>fetch(u,{cache:'reload'}).catch(()=>{}))); }catch(e){}
+    location.reload();
+  };
+  if(err && err.mathdysReload){ hard(); return; }
+  const d=document.createElement('div'); d.className='loaderr'; d.style.display='block'; d.setAttribute('role','alert');
+  d.innerHTML='<b>MathDys n’a pas pu démarrer correctement.</b> Tes cahiers ne sont pas effacés. <button class="btn primary" id="repairBtn">Réparer et recharger</button><br><small></small>';
+  d.querySelector('small').textContent=(err&&err.message)?('Détail : '+err.message):'';
+  document.body.prepend(d); document.getElementById('repairBtn').onclick=hard;
+  if(err) console.error(err);
+})();
+

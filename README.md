@@ -40,6 +40,7 @@ Il est pensé pour les élèves dyspraxiques, dyslexiques et dyscalculiques, de 
 - **Mode examen** : les aides qui donnent des réponses sont coupées, l'heure de début est imprimée sur la copie
 
 **Confort**
+- **Thème clair ou sombre automatique** (suit l'ordinateur, bouton lune / soleil), impression toujours en clair
 - **Visite guidée** au premier lancement, **menu Fichier** unique, **messages lisibles** (durée selon la longueur, bouton 🔊), **astuces au bon moment**
 - **Panneau 📚 Pages** rangées par matière (F4), **menu de la ligne** (clic droit ou toucher l'icône), **réglages en onglets** avec aperçu
 - **Pages rangées par matière**, **Mode simple**, **Annuler / Rétablir** pour tout le cahier, **déplacer les blocs**, **clavier de maths à l'écran** pour les tablettes

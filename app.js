@@ -30,7 +30,7 @@
 try{
 (function(){
 'use strict';
-const APP_VERSION='1.2.0';
+const APP_VERSION='1.3.0';
 /* La page HTML et ce fichier doivent être de la même version. Si le navigateur a gardé un ancien fichier
    en mémoire (cache), on recharge une fois les bons fichiers au lieu de démarrer à moitié. */
 (function checkVersion(){
@@ -242,7 +242,7 @@ function defaults(){
     {id:uid(),type:'text',value:'Astuce : place-toi sur une ligne et fais Ctrl+D pour la recopier, puis corrige seulement ce qui change.'},
     {id:uid(),type:'math',value:''}
   ];
-  return {pages:[p], current:p.id, settings:{level:'college', fs:20, lh:1.6, font:"'Lexend', Arial, sans-serif", theme:'clair', align:true, labels:true, check:true, focus:false, parens:false, rate:1, name:'', simple:false, vkb:'auto', teacher:false, digits:false, abbr:'', tips:true, tipsSeen:[]}, seenHelp:false};
+  return {pages:[p], current:p.id, settings:{level:'college', fs:20, lh:1.6, font:"'Lexend', Arial, sans-serif", theme:'auto', themeV:1, align:true, labels:true, check:true, focus:false, parens:false, rate:1, name:'', simple:false, vkb:'auto', teacher:false, digits:false, abbr:'', tips:true, tipsSeen:[]}, seenHelp:false};
 }
 let canStore=true;
 function load(){
@@ -264,6 +264,8 @@ function sanitize(st){
   if(!st.pages.length){ const d=defaults(); st.pages=d.pages; st.current=d.current; }
   if(!st.pages.some(p=>p.id===st.current)) st.current=st.pages[0].id;
   st.settings=Object.assign(defaults().settings, (st.settings&&typeof st.settings==='object')?st.settings:{});
+  if(!st.settings.themeV){ if(st.settings.theme==='clair') st.settings.theme='auto'; st.settings.themeV=1; }
+  if(!['auto','clair','creme','sombre'].includes(st.settings.theme)) st.settings.theme='auto';
   if(st.settings.exam && !st.pages.some(p=>p.id===st.settings.exam.page)) st.settings.exam.page=st.current;
   return st;
 }
@@ -278,7 +280,7 @@ function save(){
 function refreshFileStatus(){
   const p=page(); if(!p) return;
   const st=document.getElementById('status'); const sb=document.getElementById('saveBtn');
-  if(p.dirty){ st.textContent='● Pas encore enregistré dans un fichier'+(p.fileName?' (« '+p.fileName+' »)':''); st.style.color='var(--d)'; if(sb) sb.classList.add('primary'); }
+  if(p.dirty){ st.textContent='● Pas enregistré'; st.title='Pas encore enregistré dans un fichier'+(p.fileName?' (« '+p.fileName+' »)':'')+' : Ctrl+S'; st.style.color='var(--d)'; if(sb) sb.classList.add('primary'); }
   else if(p.fileName){ st.textContent='✓ Enregistré : '+p.fileName; st.style.color='var(--c)'; if(sb) sb.classList.remove('primary'); }
   else { st.textContent=''; if(sb) sb.classList.remove('primary'); }
 }
@@ -1141,7 +1143,7 @@ const collapsed=new Set();
 const wide=()=>{ try{ return matchMedia('(min-width:1300px)').matches; }catch(e){ return false; } };
 function renderPageList(){
   document.getElementById('pageTitle').value=page().title||'';
-  const pb=document.getElementById('pagesBtn'); if(pb) pb.innerHTML='📚 Pages <span class="pp-n">'+state.pages.length+'</span>';
+  const pb=document.getElementById('pagesBtn'); if(pb) pb.innerHTML=ICON('book')+'Pages <span class="pp-n">'+state.pages.length+'</span>';
   paintPages(); refreshFileStatus();
 }
 function paintPages(){
@@ -1589,8 +1591,8 @@ function colorAllParens(){ document.querySelectorAll('math-field').forEach(color
 
 /* ============ Réglages tout prêts ============ */
 const PRESETS={
-  defaut:{simple:false,digits:false,fs:20,lh:1.6,font:"'Lexend', Arial, sans-serif",theme:'clair',align:true,labels:true,check:true,focus:false,parens:false,rate:1},
-  dyspraxie:{simple:true,fs:24,lh:1.8,font:"'Lexend', Arial, sans-serif",theme:'clair',align:true,labels:true,check:true,focus:false,parens:true,rate:1},
+  defaut:{simple:false,digits:false,fs:20,lh:1.6,font:"'Lexend', Arial, sans-serif",theme:'auto',align:true,labels:true,check:true,focus:false,parens:false,rate:1},
+  dyspraxie:{simple:true,fs:24,lh:1.8,font:"'Lexend', Arial, sans-serif",theme:'auto',align:true,labels:true,check:true,focus:false,parens:true,rate:1},
   dyslexie:{simple:true,fs:22,lh:2.0,font:"'Andika', Arial, sans-serif",theme:'creme',align:true,labels:true,check:true,focus:true,parens:true,rate:0.9},
   dyscalculie:{simple:true,digits:true,fs:22,lh:1.8,font:"'Atkinson Hyperlegible', Arial, sans-serif",theme:'creme',align:true,labels:true,check:true,focus:false,parens:true,rate:0.85},
 };
@@ -1687,11 +1689,18 @@ document.addEventListener('focusin',e=>{ const r=e.target.closest&&e.target.clos
 
 /* ============ Barre d'outils ============ */
 function toggleFocus(){ state.settings.focus=!state.settings.focus; applySettings(); syncSettingsUI(); scheduleSave(false); toast(state.settings.focus?'Mode concentration activé (F8 pour l\u2019enlever)':'Mode concentration désactivé'); }
+const ICONS={book:'M4 5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2z|M4 21a2 2 0 0 1 2-2h13', undo:'M9 14 4 9l5-5|M4 9h10.5a5.5 5.5 0 0 1 0 11H11', redo:'m15 14 5-5-5-5|M20 9H9.5a5.5 5.5 0 0 0 0 11H13',
+  plus:'M12 5v14|M5 12h14', copy:'M8 8h11v11H8z|M5 16V5h11', check:'m5 12 5 5 9-10', vol:'M11 5 6 9H3v6h3l5 4z|M15.5 8.5a5 5 0 0 1 0 7|M18.5 5.5a9 9 0 0 1 0 13',
+  target:'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18z|M12 16a4 4 0 1 0 0-8 4 4 0 0 0 0 8z|M12 12h.01', search:'M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14z|m20 20-4-4', eq:'M5 9h14|M5 15h14', menu:'M4 7h16|M4 12h16|M4 17h16'};
+const ICON=n=>'<svg class="ic" viewBox="0 0 24 24" aria-hidden="true">'+ICONS[n].split('|').map(d=>'<path d="'+d+'"/>').join('')+'</svg>';
+const GLYPH={'↶':'undo','↷':'redo','＋':'plus','✓':'check','🔊':'vol','🎯':'target','🔍':'search','☰':'menu'};
+function toolLabel(label){ const m=label.match(/^(\S+)\s(.+)$/); if(m && GLYPH[m[1]]) return ICON(GLYPH[m[1]])+'<span>'+m[2]+'</span>';
+  if(label==='Dupliquer') return ICON('copy')+'<span>'+label+'</span>'; if(label==='Calculer') return ICON('eq')+'<span>'+label+'</span>'; return '<span>'+label+'</span>'; }
 function renderTools(){
   const box=document.getElementById('tools'); box.innerHTML='';
   const simple=!!state.settings.simple, L=state.settings.level;
   const act=(label,keys,fn,title,id)=>{ const b=document.createElement('button'); b.className='tool'; b.title=title||label; if(id) b.id=id;
-    b.innerHTML='<span>'+label+'</span>'+(keys&&!simple?' <kbd>'+keys+'</kbd>':''); b.addEventListener('mousedown',e=>e.preventDefault()); b.addEventListener('click',fn); box.append(b); return b; };
+    b.innerHTML=toolLabel(label)+(keys&&!simple?' <kbd>'+keys+'</kbd>':''); b.addEventListener('mousedown',e=>e.preventDefault()); b.addEventListener('click',fn); box.append(b); return b; };
   act('↶ Annuler','Ctrl+Z',undo,'Annuler (Ctrl+Z)','undoBtn'); act('↷ Rétablir','Ctrl+Y',redo,'Rétablir (Ctrl+Y)','redoBtn');
   const sep=()=>{ const d=document.createElement('div'); d.className='sep'; box.append(d); }; sep();
   act('＋ Calcul','Entrée',()=>addRowAfter(currentId,'math'),'Nouvelle ligne de calcul (Entrée)');
@@ -1819,6 +1828,7 @@ function helpHTML(){
     ['<kbd>⌫</kbd> sur une ligne vide','supprimer la ligne'],
     ['<kbd>Ctrl</kbd>+<kbd>Maj</kbd>+<kbd>⌫</kbd> ou 🗑 à droite','supprimer n’importe quel bloc (graphique, opération posée…). « Annuler » le remet pendant quelques secondes'],
     ['Clic droit sur une ligne, ou toucher l’icône à gauche (tablette)','le menu de la ligne : monter, descendre, dupliquer, changer en texte ou en calcul, supprimer'],
+    ['Bouton lune / soleil en haut','passer du thème clair au thème sombre. Par défaut, MathDys suit le réglage de ton ordinateur'],
     ['<kbd>F4</kbd> ou 📚 Pages','la liste de tes pages, rangées par matière : ouvrir, chercher, ranger, supprimer'],
     ['<kbd>Ctrl</kbd>+<kbd>Entrée</kbd>','calculer la ligne (nombres seulement) et écrire le résultat'],
     ['# au début d\u2019un texte','en faire un titre'],
@@ -1947,10 +1957,25 @@ function ask(text,cb,opt){ document.getElementById('askText').textContent=text; 
 on('askIn','keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); document.getElementById('askOk').click(); } });
 on('askOk','click',()=>{ document.getElementById('askDlg').classList.remove('open'); const v=document.getElementById('askIn').value; if(askCb) askCb(v); askCb=null; });
 
+/* ---------- thème : automatique (comme l'ordinateur), clair, crème ou sombre ---------- */
+const MOON_IC='<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/></svg>';
+const SUN_IC='<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.9 4.9 1.4 1.4"/><path d="m17.7 17.7 1.4 1.4"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m4.9 19.1 1.4-1.4"/><path d="m17.7 6.3 1.4-1.4"/></svg>';
+let printing=false;
+const darkMQ=(()=>{ try{ return matchMedia('(prefers-color-scheme: dark)'); }catch(e){ return {matches:false}; } })();
+function themeNow(){ if(printing) return 'clair'; const t=state.settings.theme||'auto'; return t==='auto'?(darkMQ.matches?'sombre':'clair'):t; }
+try{ darkMQ.addEventListener('change',()=>{ if((state.settings.theme||'auto')==='auto') applySettings(); }); }catch(e){}
+// à l'impression, toujours en clair (les graphiques sont redessinés)
+window.addEventListener('beforeprint',()=>{ printing=true; applySettings(); });
+window.addEventListener('afterprint',()=>{ printing=false; applySettings(); });
+function toggleTheme(){ const dark=themeNow()==='sombre'; state.settings.theme=dark?'clair':'sombre'; applySettings(); syncSettingsUI(); scheduleSave(false);
+  toast(dark?'Thème clair':'Thème sombre — Réglages › Couleurs › « Automatique » pour suivre l’ordinateur'); }
 function applySettings(){
   const s=state.settings, r=document.documentElement.style;
   r.setProperty('--fs',s.fs+'px'); r.setProperty('--lh',s.lh); r.setProperty('--font',s.font);
-  document.body.className='theme-'+s.theme+(s.focus?' focusmode':'')+(vkbOn()?' vkb':'')+(isExam()?' exam':'');
+  const th=themeNow();
+  document.body.className='theme-'+th+(s.focus?' focusmode':'')+(vkbOn()?' vkb':'')+(isExam()?' exam':'')+(document.getElementById('pagesPanel')&&!document.getElementById('pagesPanel').hidden?' pages-open':'');
+  const mt=document.querySelector('meta[name=theme-color]'); if(mt) mt.content=th==='sombre'?'#16203a':th==='creme'?'#fdf8ec':'#ffffff';
+  const tb=document.getElementById('themeBtn'); if(tb){ const dark=th==='sombre'; tb.innerHTML=dark?SUN_IC:MOON_IC; tb.title=dark?'Thème clair':'Thème sombre'; tb.setAttribute('aria-label',dark?'Passer en thème clair':'Passer en thème sombre'); }
   const fb=document.getElementById('focusBtn'); if(fb) fb.classList.toggle('primary',!!s.focus);
   document.getElementById('levelSel').value=s.level;
   scheduleAlign();
@@ -1965,6 +1990,13 @@ const bind=(id,key,conv,ev)=>{ const el=document.getElementById(id); BOUND.push(
 bind('sFs','fs',Number); bind('sLh','lh',Number); bind('sFont','font',String,'change'); bind('sTheme','theme',String,'change');
 bind('sName','name',String); bind('sFocus','focus',Boolean,'change'); bind('sParens','parens',Boolean,'change'); bind('sRate','rate',Number); bind('sSimple','simple',Boolean,'change'); bind('sAbbr','abbr',String,'change'); bind('sDigits','digits',Boolean,'change'); bind('sTeacher','teacher',Boolean,'change'); bind('sVkb','vkb',String,'change'); bind('sAlign','align',Boolean,'change'); bind('sLabels','labels',Boolean,'change'); bind('sCheck','check',Boolean,'change'); bind('sTips','tips',Boolean,'change');
 on('levelSel','change',e=>{ state.settings.level=e.target.value; renderTools(); scheduleSave(false); toast('Niveau : '+e.target.selectedOptions[0].textContent); });
+on('themeBtn','click',toggleTheme);
+// hauteurs réelles du bandeau d'examen et de la barre du haut (le bandeau peut passer sur plusieurs lignes)
+(function(){ const R=document.documentElement.style, ex=document.getElementById('examBar'), hd=document.querySelector('header');
+  const upd=()=>{ R.setProperty('--exam-h',(ex&&!ex.hidden?ex.offsetHeight:0)+'px'); R.setProperty('--head-h',(hd?hd.offsetHeight:0)+'px'); };
+  try{ const ro=new ResizeObserver(upd); if(ex) ro.observe(ex); if(hd) ro.observe(hd); }catch(e){ window.addEventListener('resize',upd); }
+  try{ new MutationObserver(upd).observe(ex,{attributes:true,attributeFilter:['hidden']}); }catch(e){}
+  upd(); })();
 on('settingsBtn','click',()=>{ openDlg('setDlg'); paintPreview(); });
 function setTab(t){ document.querySelectorAll('#setDlg .stab-btn').forEach(b=>{ const on=b.dataset.tab===t; b.classList.toggle('on',on); b.setAttribute('aria-selected',String(on)); b.tabIndex=on?0:-1; });
   document.querySelectorAll('#setDlg .stab').forEach(p=>p.hidden=p.dataset.tab!==t); }
@@ -2455,6 +2487,8 @@ function runSelfTest(){
   ok('menu Fichier : toutes les actions',['open','saveas','all','pdf','word','odt','txt','latex'].every(a=>document.querySelector('#fileMenu [data-act="'+a+'"]')));
   ok('réglages rangés en 4 onglets',document.querySelectorAll('#setDlg .stab').length===4);
   ok('panneau des pages présent',!!document.getElementById('pagesList'));
+  ok('thème automatique : suit l’ordinateur',(()=>{ const t=state.settings.theme; state.settings.theme='auto'; const r=themeNow()===(darkMQ.matches?'sombre':'clair'); state.settings.theme=t; return r; })());
+  ok('logo présent dans la barre',!!document.querySelector('header .logo'));
   ok('éditeur de formules MathLive chargé',!!MFE,'MathLive ne s’est pas chargé');
   ok('enregistrement dans le navigateur',canStore);
   return res;

@@ -5,24 +5,24 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>MathDys — cahier de maths</title>
 <meta name="description" content="Cahier de maths au clavier pour les élèves multi-dys. Aucun compte, tout reste sur ton ordinateur.">
-<meta name="theme-color" content="#2f6fde">
+<meta name="theme-color" content="#ffffff">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Andika&family=Atkinson+Hyperlegible:wght@400;700&family=Lexend:wght@400;600&display=swap" rel="stylesheet">
-<meta name="mathdys-version" content="1.2.0">
+<meta name="mathdys-version" content="1.3.0">
 <!-- Éditeur de formules MathLive 0.104.2 (version figée : une mise à jour de leur côté ne peut pas casser MathDys) -->
 <script src="https://cdn.jsdelivr.net/npm/mathlive@0.104.2/dist/mathlive.min.js"></script>
-<link rel="stylesheet" href="style.css?v=1.2.0">
+<link rel="stylesheet" href="style.css?v=1.3.0">
 </head>
 <body>
 <div class="exambar" id="examBar" hidden role="status"><span class="ex-txt"></span><button class="btn" id="examQuit">Quitter le mode examen</button></div>
 <header>
   <div class="bar">
-    <div class="brand">Math<span>Dys</span></div>
-    <button class="btn" id="pagesBtn" aria-expanded="false" aria-controls="pagesPanel" title="Voir et ranger mes pages">📚 Pages</button>
+    <div class="brand" aria-label="MathDys"><svg class="logo" viewBox="0 0 512 512" aria-hidden="true"><rect width="512" height="512" rx="120" fill="var(--brand)"/><path d="M181 206V102l75 68 75-68v104" fill="none" stroke="var(--brand-ink)" stroke-width="40" stroke-linecap="round" stroke-linejoin="round"/><rect x="166" y="234" width="180" height="44" rx="22" fill="var(--sig)"/><path d="M207 306v106h48a53 53 0 0 0 0-106z" fill="none" stroke="var(--brand-ink)" stroke-width="40" stroke-linejoin="round"/></svg><span class="wm">MathDys</span></div>
+    <button class="btn" id="pagesBtn" aria-expanded="false" aria-controls="pagesPanel" title="Voir et ranger mes pages (F4)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2z"/><path d="M4 21a2 2 0 0 1 2-2h13"/></svg>Pages</button>
     <input id="pageTitle" class="pageTitle" aria-label="Titre de la page" title="Nom de la page (clique pour renommer)">
     <div class="grow"></div>
     <span class="status" id="status"></span>
@@ -31,9 +31,9 @@
       <option value="college">Collège</option>
       <option value="lycee">Lycée</option>
     </select>
-    <button class="btn" id="saveBtn" title="Enregistrer cette page sur ton ordinateur (Ctrl+S)">💾 Enregistrer</button>
+    <button class="btn" id="saveBtn" title="Enregistrer cette page sur ton ordinateur (Ctrl+S)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h11l3 3v13H5z"/><path d="M8 4v5h7V4"/><path d="M8 20v-6h8v6"/></svg>Enregistrer</button>
     <div class="menuwrap">
-      <button class="btn" id="fileBtn" aria-haspopup="menu" aria-expanded="false" aria-controls="fileMenu" title="Ouvrir, enregistrer, imprimer, exporter">📁 Fichier ▾</button>
+      <button class="btn" id="fileBtn" aria-haspopup="menu" aria-expanded="false" aria-controls="fileMenu" title="Ouvrir, enregistrer, imprimer, exporter"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4"/></svg>Fichier<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m7 10 5 5 5-5"/></svg></button>
       <div class="menu" id="fileMenu" role="menu" hidden>
         <button role="menuitem" id="openBtn" data-act="open">📂 Ouvrir une page ou une sauvegarde… <kbd>Ctrl+O</kbd></button>
         <button role="menuitem" data-act="saveas">💾 Enregistrer sous… <kbd>Ctrl+Maj+S</kbd></button>
@@ -49,7 +49,8 @@
     </div>
     <input type="file" id="fileIn" accept=".mathdys,.json,application/json" hidden>
     <input type="file" id="imgIn" accept="image/*" hidden>
-    <button class="btn" id="settingsBtn" title="Réglages">⚙ Réglages</button>
+    <button class="btn icon" id="themeBtn" title="Thème sombre" aria-label="Passer en thème sombre"></button>
+    <button class="btn" id="settingsBtn" title="Réglages"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z"/><path d="M19 12h2"/><path d="M3 12h2"/><path d="M12 3v2"/><path d="M12 19v2"/><path d="m17 7 1.5-1.5"/><path d="m5.5 18.5 1.5-1.5"/><path d="m17 17 1.5 1.5"/><path d="M5.5 5.5 7 7"/></svg>Réglages</button>
     <button class="btn primary" id="helpBtn" title="Aide et raccourcis (F1)">? Aide</button>
   </div>
   <div class="tools" id="tools" role="toolbar" aria-label="Outils"></div>
@@ -119,7 +120,7 @@
         <option value="Arial, sans-serif">Arial</option>
       </select></div>
     <div class="field"><label for="sTheme">Couleurs</label>
-      <select id="sTheme" class="btn"><option value="clair">Clair</option><option value="creme">Crème (moins éblouissant)</option><option value="sombre">Sombre</option></select></div>
+      <select id="sTheme" class="btn"><option value="auto">Automatique (comme l’ordinateur)</option><option value="clair">Clair</option><option value="creme">Crème (moins éblouissant)</option><option value="sombre">Sombre</option></select></div>
     <div class="field"><label for="sParens">Colorer les parenthèses par paire</label><input type="checkbox" id="sParens"></div>
     <div class="field"><label for="sDigits">Colorer les chiffres (bleu) et les lettres (violet) dans les calculs</label><input type="checkbox" id="sDigits"></div>
     <div class="field"><label for="sFocus">Mode concentration : estomper les autres lignes (F8)</label><input type="checkbox" id="sFocus"></div>
@@ -185,6 +186,6 @@
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 <div class="drop" id="drop">Lâche le fichier ici pour l’ouvrir</div>
 
-<script src="app.js?v=1.2.0"></script>
+<script src="app.js?v=1.3.0"></script>
 </body>
 </html>

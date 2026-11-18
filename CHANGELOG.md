@@ -1,5 +1,16 @@
 # Nouveautés de MathDys
 
+## Version 1.3.0 — nouvelle identité « Signature »
+- **Nouveau logo** : « M » sur « D », séparés par un trait de fraction abricot. Nouvelle icône d'application et d'onglet.
+- **Une identité qu'on reconnaît** : le trait de fraction souligne l'onglet actif et les titres, la ligne en cours est **surlignée comme au stabilo**, et le fond est un **papier pointé** discret. Icônes fines à la place des émojis dans les barres d'outils.
+- **Thème automatique** : MathDys suit le réglage clair ou sombre de l'ordinateur. Un bouton lune / soleil en haut change en un clic. Le thème sombre est bleu nuit avec un texte blanc cassé, plus reposant. L'impression et le PDF sortent toujours en clair.
+- **Téléphones et tablettes** : plusieurs réglages pour petits écrans ne s'appliquaient pas ; c'est corrigé (marges, tailles, flèches ▲▼ cachées). Le bouton 🗑 reste visible au doigt. Le titre de la page est de nouveau visible et modifiable.
+- **Messages** : ils ne sont plus écrasés sur une colonne étroite sur téléphone.
+- **Mode examen** : la barre d'outils ne passe plus sous le bandeau rouge quand il tient sur plusieurs lignes.
+- **Grand écran** : le panneau 📚 Pages se range sous la barre du haut au lieu de la recouvrir.
+- **Thème sombre** : bouton « Annuler » des messages, cases d'erreur et cases des opérations posées enfin lisibles.
+- Textes trop petits agrandis ; réglage « réduire les animations » de l'ordinateur respecté ; feuille de style réorganisée et commentée.
+
 ## Version 1.2.0 — plus simple à prendre en main
 - **Écran plus léger** : un seul menu **📁 Fichier** (ouvrir, enregistrer sous, sauvegarder tout le cahier, imprimer ou PDF, Word, LibreOffice, copier). **💾 Enregistrer** reste à portée de main. Les boutons qui n'avaient qu'un symbole ont maintenant un nom (↶ Annuler, ↷ Rétablir, 🎯 Concentration).
 - **Visite guidée** au premier lancement, à faire en vrai sur la page : une fraction, Entrée, Ctrl+D, F9, Ctrl+K. Elle remplace le grand tableau d'aide. À revoir depuis l'aide (F1) ou les réglages.

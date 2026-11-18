@@ -1,0 +1,1 @@
+MathLive 0.104.2 — https://mathlive.io — licence MIT (voir le fichier LICENSE).

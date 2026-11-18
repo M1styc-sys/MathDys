@@ -18,6 +18,7 @@
    - Fenêtres, réglages, pages
    - Export : texte lisible, LaTeX, Word / LibreOffice
    - Fichiers sur l'ordinateur (aucun compte, aucun serveur)
+   - Visite guidée et astuces
    - Mode examen : les aides qui donnent des réponses sont coupées
    - Signaler un bug
    - Hors ligne : installation comme une application
@@ -29,7 +30,7 @@
 try{
 (function(){
 'use strict';
-const APP_VERSION='1.1.1';
+const APP_VERSION='1.2.0';
 /* La page HTML et ce fichier doivent être de la même version. Si le navigateur a gardé un ancien fichier
    en mémoire (cache), on recharge une fois les bons fichiers au lieu de démarrer à moitié. */
 (function checkVersion(){
@@ -241,7 +242,7 @@ function defaults(){
     {id:uid(),type:'text',value:'Astuce : place-toi sur une ligne et fais Ctrl+D pour la recopier, puis corrige seulement ce qui change.'},
     {id:uid(),type:'math',value:''}
   ];
-  return {pages:[p], current:p.id, settings:{level:'college', fs:20, lh:1.6, font:"'Lexend', Arial, sans-serif", theme:'clair', align:true, labels:true, check:true, focus:false, parens:false, rate:1, name:'', simple:false, vkb:'auto', teacher:false, digits:false, abbr:''}, seenHelp:false};
+  return {pages:[p], current:p.id, settings:{level:'college', fs:20, lh:1.6, font:"'Lexend', Arial, sans-serif", theme:'clair', align:true, labels:true, check:true, focus:false, parens:false, rate:1, name:'', simple:false, vkb:'auto', teacher:false, digits:false, abbr:'', tips:true, tipsSeen:[]}, seenHelp:false};
 }
 let canStore=true;
 function load(){
@@ -268,7 +269,7 @@ function sanitize(st){
 }
 let state = sanitize(load() || defaults());
 let saveTimer=null;
-function scheduleSave(dirty){ if(dirty!==false){ const p=page(); if(p) p.dirty=true; noteChange(); } clearTimeout(saveTimer); saveTimer=setTimeout(save,400); refreshFileStatus(); }
+function scheduleSave(dirty){ updEmpty(); if(dirty!==false){ const p=page(); if(p) p.dirty=true; noteChange(); } clearTimeout(saveTimer); saveTimer=setTimeout(save,400); refreshFileStatus(); }
 function save(){
   try{ localStorage.setItem(KEY, JSON.stringify(state)); canStore=true; }
   catch(e){ if(canStore) toast('Mémoire du navigateur pleine : enregistre ton cahier dans un fichier (Ctrl+S)'); canStore=false; }
@@ -337,9 +338,14 @@ function makeRowEl(row){
   g.className='gutter'; g.tabIndex=-1;
   const B=BLOCKS[row.type]||BLOCKS.math;
   g.textContent=B.icon;
-  g.title = (row.type==='math'||row.type==='text') ? B.label+' — clic pour changer (Ctrl+M)' : B.label;
+  const sw=row.type==='math'||row.type==='text';
+  g.title = sw ? B.label+' — clic : changer en '+(row.type==='math'?'texte':'calcul')+' (Ctrl+M) · clic droit : plus d’actions' : B.label+' — clic : déplacer, dupliquer, supprimer…';
+  g.setAttribute('aria-haspopup','menu');
+  let pt='mouse';
+  g.addEventListener('pointerdown',e=>{ pt=e.pointerType||'mouse'; });
   g.addEventListener('mousedown',e=>e.preventDefault());
-  g.addEventListener('click',()=>{ if(row.type==='math'||row.type==='text') toggleType(row.id); });
+  g.addEventListener('click',()=>{ if(sw && pt==='mouse') toggleType(row.id); else openRowMenu(row.id,g); });
+  g.addEventListener('contextmenu',e=>{ e.preventDefault(); openRowMenu(row.id,g); });
   const body=document.createElement('div'); body.className='body';
   const del=document.createElement('button'); del.className='rdel'; del.tabIndex=-1; del.textContent='🗑';
   del.title='Supprimer ce bloc (Ctrl+Maj+Retour arrière)';
@@ -358,6 +364,7 @@ function makeRowEl(row){
   [['▲',-1,'Monter ce bloc (Alt+↑)'],['▼',1,'Descendre ce bloc (Alt+↓)']].forEach(([t,d,tt])=>{ const b=document.createElement('button'); b.textContent=t; b.title=tt; b.tabIndex=-1;
     b.addEventListener('mousedown',e=>e.preventDefault()); b.addEventListener('click',()=>moveRow(row.id,d)); mv.append(b); });
   el.append(g,body,mv,del);
+  el.addEventListener('contextmenu',e=>{ if(e.target.closest('math-field,.txt,input,textarea,[contenteditable=true],canvas')) return; e.preventDefault(); openRowMenu(row.id,g); });
   if(row.type==='math'||row.type==='text'){
     el.addEventListener('pointerup',e=>{
       if(e.button!==0 || e.target.closest('button')) return;
@@ -383,7 +390,7 @@ function buildMath(row,body){
   mf.setAttribute('math-virtual-keyboard-policy',vkbOn()?'auto':'manual');
   body.append(mf);
   const msg=document.createElement('div'); msg.className='calcmsg'; body.append(msg);
-  mf.addEventListener('input',()=>{ row.value=mf.value; msg.textContent=''; msg.className='calcmsg'; scheduleSave(); scheduleAlign(); });
+  mf.addEventListener('input',()=>{ row.value=mf.value; msg.textContent=''; msg.className='calcmsg'; scheduleSave(); scheduleAlign(); tipRetype(row); emit('type'); });
   mf.addEventListener('move-out',e=>{
     const d=e.detail && e.detail.direction;
     if(d==='upward'){ const p=prevId(row.id); if(p){ e.preventDefault(); focusRow(p,'end'); } }
@@ -1129,17 +1136,62 @@ function renderPage(){
   HIST.stable=snap();
 }
 const subjects=()=>[...new Set(state.pages.map(p=>p.subject).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'fr'));
+let pagesQ='';
+const collapsed=new Set();
+const wide=()=>{ try{ return matchMedia('(min-width:1300px)').matches; }catch(e){ return false; } };
 function renderPageList(){
-  const sel=document.getElementById('pageSel'); sel.innerHTML='';
-  const groups=subjects(); const opt=p=>{ const o=document.createElement('option'); o.value=p.id; o.textContent=p.title||'Sans titre'; if(p.id===state.current) o.selected=true; return o; };
-  groups.forEach(g=>{ const og=document.createElement('optgroup'); og.label='📁 '+g; state.pages.filter(p=>p.subject===g).forEach(p=>og.append(opt(p))); sel.append(og); });
-  const rest=state.pages.filter(p=>!p.subject);
-  if(groups.length && rest.length){ const og=document.createElement('optgroup'); og.label='Sans matière'; rest.forEach(p=>og.append(opt(p))); sel.append(og); } else rest.forEach(p=>sel.append(opt(p)));
-  const og=document.createElement('optgroup'); og.label='────────';
-  const o2=document.createElement('option'); o2.value='__subj'; o2.textContent='📁 Ranger cette page dans une matière…'; og.append(o2);
-  const o=document.createElement('option'); o.value='__del'; o.textContent='🗑 Supprimer cette page…'; og.append(o); sel.append(og);
   document.getElementById('pageTitle').value=page().title||'';
-  refreshFileStatus();
+  const pb=document.getElementById('pagesBtn'); if(pb) pb.innerHTML='📚 Pages <span class="pp-n">'+state.pages.length+'</span>';
+  paintPages(); refreshFileStatus();
+}
+function paintPages(){
+  const box=document.getElementById('pagesList'); if(!box) return; box.innerHTML='';
+  const q=deacc(pagesQ.trim());
+  const match=p=>!q||deacc((p.title||'')+' '+(p.subject||'')).includes(q);
+  const item=p=>{ const d=document.createElement('div'); d.className='pp-item'+(p.id===state.current?' on':''); d.setAttribute('role','listitem');
+    const nm=p.title||'Sans titre';
+    const go=document.createElement('button'); go.className='pp-go'; go.textContent=nm; go.title=p.dirty?'Pas encore enregistrée dans un fichier':'Ouvrir cette page';
+    if(p.dirty&&p.rows.some(r=>!isEmpty(r))){ const dot=document.createElement('span'); dot.textContent=' ●'; dot.style.color='var(--ko)'; dot.setAttribute('aria-label','pas enregistrée'); go.append(dot); }
+    if(p.id===state.current) go.setAttribute('aria-current','page');
+    go.addEventListener('click',()=>gotoPage(p.id));
+    const mv=document.createElement('button'); mv.className='pp-act'; mv.textContent='📁'; mv.title='Ranger dans une matière'; mv.setAttribute('aria-label','Ranger « '+nm+' » dans une matière'); mv.addEventListener('click',()=>askSubject(p.id));
+    const del=document.createElement('button'); del.className='pp-act'; del.textContent='🗑'; del.title='Supprimer cette page'; del.setAttribute('aria-label','Supprimer « '+nm+' »'); del.addEventListener('click',()=>deletePage(p.id));
+    d.append(go,mv,del); return d; };
+  const group=(label,list,key)=>{ if(!list.length) return; const det=document.createElement('details'); det.open=!!q||!collapsed.has(key);
+    det.addEventListener('toggle',()=>{ if(!q){ if(det.open) collapsed.delete(key); else collapsed.add(key); } });
+    const sm=document.createElement('summary'); sm.textContent=label+' ('+list.length+')'; det.append(sm); list.forEach(p=>det.append(item(p))); box.append(det); };
+  const groups=subjects();
+  groups.forEach(g=>group('📁 '+g,state.pages.filter(p=>p.subject===g&&match(p)),g));
+  const rest=state.pages.filter(p=>!p.subject&&match(p));
+  if(groups.length) group('Sans matière',rest,'__none'); else rest.forEach(p=>box.append(item(p)));
+  if(!box.children.length){ const m=document.createElement('p'); m.className='op-msg'; m.textContent='Aucune page ne correspond.'; box.append(m); }
+}
+function gotoPage(id){
+  if(isExam()) return examRefused('Changer de page');
+  state.current=id; renderPage(); scheduleSave(false);
+  if(!wide()) setPages(false);
+  const R=page().rows; if(R.length) focusRow(R[R.length-1].id,'end');
+}
+function askSubject(id){
+  const p=state.pages.find(q=>q.id===id); if(!p) return;
+  ask('Dans quelle matière ranger « '+(p.title||'Sans titre')+' » ?',val=>{ p.subject=(val||'').trim().slice(0,40)||undefined; renderPageList(); scheduleSave(false); },
+    {input:true,value:p.subject||'',placeholder:'Maths, Physique, Chapitre 3…',list:subjects(),ok:'Ranger'});
+}
+function deletePage(id){
+  const p=state.pages.find(q=>q.id===id); if(!p) return;
+  if(isExam()) return examRefused('Supprimer une page');
+  ask('Supprimer la page « '+(p.title||'Sans titre')+' » ? Pense à l’enregistrer avant si tu veux la garder.',()=>{
+    state.pages=state.pages.filter(q=>q.id!==id); if(!state.pages.length) state.pages.push(newPage());
+    if(!state.pages.some(q=>q.id===state.current)) state.current=state.pages[0].id;
+    renderPage(); scheduleSave(false); toast('Page supprimée'); },{ok:'Supprimer'});
+}
+function setPages(open){
+  const P=document.getElementById('pagesPanel'), pb=document.getElementById('pagesBtn');
+  if(open && isExam()) return examRefused('La liste des pages');
+  P.hidden=!open; document.body.classList.toggle('pages-open',open); pb.setAttribute('aria-expanded',String(open));
+  if(open){ pagesQ=''; document.getElementById('pagesFind').value=''; paintPages(); document.getElementById('pagesFind').focus(); }
+  else if(currentId && P.contains(document.activeElement)) focusRow(currentId,'end');
+  setTimeout(()=>{ scheduleAlign(); updMore(); },50);
 }
 
 /* ---------- Actions sur les lignes ---------- */
@@ -1169,10 +1221,12 @@ function addRowAfter(id,type,value){
   scheduleSave(); scheduleAlign();
   return row;
 }
+const DUPS=new WeakSet();
 function duplicate(id){
   const r=rowById(id); if(!r) return;
   addRowAfter(id, r.type, JSON.parse(JSON.stringify(r.value))); // la copie n'est jamais verrouillée : l'élève peut travailler dessus
-  toast('Ligne recopiée — corrige ce qui change');
+  const nr=page().rows[idx(id)+1]; if(nr) DUPS.add(nr);
+  emit('dup'); toast('Ligne recopiée — corrige ce qui change');
 }
 function removeRow(id,noHist){
   const R=page().rows; const i=idx(id); if(i<0||R.length<=1) return;
@@ -1410,7 +1464,7 @@ function equivalent(a,b,vars){ // b découle-t-elle de a (opérations sur les de
   if(a.type!=='eq' && a.type!=='ne' && r0<0) return false; // inégalité : le sens doit suivre
   return true;
 }
-function checkSteps(){
+function checkSteps(){ emit('check');
   if(isExam()) return examRefused('La vérification des étapes');
   const R=page().rows; let ok=0, bad=0, unk=0, prev=null;
   const mark=(r,cls,txt)=>{ const el=els.get(r.id); const m=el&&el.querySelector('.calcmsg'); if(m){ m.className='calcmsg '+cls; m.textContent=txt; } };
@@ -1551,6 +1605,11 @@ window.addEventListener('keydown',e=>{
   if(e.key==='F2'){ e.preventDefault(); if(e.shiftKey) speakPage(); else speakCurrent(); return; }
   if(e.key==='F8'){ e.preventDefault(); toggleFocus(); return; }
   if(e.key==='F9'){ e.preventDefault(); checkSteps(); return; }
+  if(e.key==='Escape' && !document.querySelector('.overlay.open')){
+    if(closeMenus(true)){ e.preventDefault(); e.stopPropagation(); return; }
+    const P=document.getElementById('pagesPanel'); if(!P.hidden && (P.contains(document.activeElement)||!wide())){ e.preventDefault(); e.stopPropagation(); setPages(false); if(currentId) focusRow(currentId,'end'); return; }
+    if(tourBox && tourBox.contains(document.activeElement)){ e.preventDefault(); endTour(); if(currentId) focusRow(currentId,'end'); return; } }
+  if(e.key==='F4'){ e.preventDefault(); setPages(document.getElementById('pagesPanel').hidden); return; }
   if(e.key==='Escape'){ const o=document.querySelectorAll('.overlay.open'); if(o.length){ e.preventDefault(); e.stopPropagation(); o.forEach(x=>x.classList.remove('open')); if(currentId) focusRow(currentId,'end'); } return; }
   if(document.querySelector('.overlay.open')) return;
   const ctrl=e.ctrlKey||e.metaKey; const k=e.key.toLowerCase();
@@ -1571,6 +1630,7 @@ window.addEventListener('keydown',e=>{
     if(global && currentId && els.get(currentId)) rowEl=els.get(currentId); else return; }
   const id=rowEl.dataset.id; const row=rowById(id); if(!row) return;
   if(ctrl && e.shiftKey && e.key==='Backspace'){ stop(); deleteRow(id); return; }
+  if(e.key==='ContextMenu' || (e.shiftKey && e.key==='F10')){ stop(); openRowMenu(id,rowEl.querySelector('.gutter')||rowEl); return; }
   if(e.altKey && !ctrl && (e.key==='ArrowUp'||e.key==='ArrowDown')){ stop(); moveRow(id,e.key==='ArrowUp'?-1:1); return; }
   if(ctrl && !e.shiftKey && k==='d'){ stop(); duplicate(id); return; }
   if(ctrl && !e.shiftKey && !e.altKey && k==='g'){ stop(); addRowAfter(id,'graph'); return; }
@@ -1632,7 +1692,7 @@ function renderTools(){
   const simple=!!state.settings.simple, L=state.settings.level;
   const act=(label,keys,fn,title,id)=>{ const b=document.createElement('button'); b.className='tool'; b.title=title||label; if(id) b.id=id;
     b.innerHTML='<span>'+label+'</span>'+(keys&&!simple?' <kbd>'+keys+'</kbd>':''); b.addEventListener('mousedown',e=>e.preventDefault()); b.addEventListener('click',fn); box.append(b); return b; };
-  act('↶','Ctrl+Z',undo,'Annuler (Ctrl+Z)','undoBtn'); act('↷','Ctrl+Y',redo,'Rétablir (Ctrl+Y)','redoBtn');
+  act('↶ Annuler','Ctrl+Z',undo,'Annuler (Ctrl+Z)','undoBtn'); act('↷ Rétablir','Ctrl+Y',redo,'Rétablir (Ctrl+Y)','redoBtn');
   const sep=()=>{ const d=document.createElement('div'); d.className='sep'; box.append(d); }; sep();
   act('＋ Calcul','Entrée',()=>addRowAfter(currentId,'math'),'Nouvelle ligne de calcul (Entrée)');
   act('＋ Texte','Maj+Entrée',()=>addRowAfter(currentId,'text'),'Nouvelle ligne de texte (Maj+Entrée)');
@@ -1648,14 +1708,14 @@ function renderTools(){
   if(!simple && !examCut('calc')) act('Calculer','Ctrl+Entrée',()=>{ const r=currentId&&rowById(currentId); if(r&&r.type==='math') compute(currentId); else toast('Place-toi sur une ligne de calcul'); });
   if(!isExam()) act('✓ Vérifier','F9',checkSteps,'Vérifier mes étapes de calcul : signale la ligne où une erreur s\u2019est glissée (F9)');
   act('🔊 Lire','F2',speakCurrent,'Lire la ligne à voix haute (F2 ; Maj+F2 : toute la page). Appuie encore pour arrêter.');
-  const fb=act('🎯','F8',toggleFocus,'Mode concentration : estomper les autres lignes (F8)','focusBtn'); if(state.settings.focus) fb.classList.add('primary');
+  const fb=act('🎯 Concentration','F8',toggleFocus,'Mode concentration : estomper les autres lignes (F8)','focusBtn'); if(state.settings.focus) fb.classList.add('primary');
   act('🔍 Symbole','Ctrl+K',openSearch,'Chercher un symbole ou un outil par son nom (Ctrl+K)');
   const sw=act(simple?'☰ Tous les outils':'Mode simple','',toggleSimple, simple?'Afficher tous les boutons':'N\u2019afficher que l\u2019essentiel (tout reste accessible au clavier et avec Ctrl+K)');
   sw.classList.add('simple-toggle');
   ariaFix(box);
   document.getElementById('cats').style.display=simple?'none':'';
   document.getElementById('items').style.display=simple?'none':'';
-  renderCats();
+  renderCats(); updMore();
 }
 function toggleSimple(){ state.settings.simple=!state.settings.simple; renderTools(); syncSettingsUI(); scheduleSave(false);
   toast(state.settings.simple?'Mode simple : tous les outils restent dans Ctrl+K':'Tous les outils sont affichés'); }
@@ -1669,6 +1729,7 @@ function renderCats(){
     b.addEventListener('click',()=>{ curCat=c.cat; renderCats(); }); cats.append(b); });
   const box=document.getElementById('items'); box.innerHTML='';
   symsFor(state.settings.level).filter(s=>s.cat===curCat).forEach(s=>box.append(symButton(s)));
+  updMore();
 }
 function symButton(s){
   const b=document.createElement('button'); b.className='tool';
@@ -1676,7 +1737,7 @@ function symButton(s){
   b.innerHTML='<span class="sym"></span>'+(s.key?' <kbd></kbd>':'');
   b.querySelector('.sym').textContent=s.sym; if(s.key) b.querySelector('kbd').textContent=s.key;
   b.addEventListener('mousedown',e=>e.preventDefault());
-  b.addEventListener('click',()=>insertTpl(s.tpl));
+  b.addEventListener('click',()=>{ insertTpl(s.tpl); tipClick(s); });
   return b;
 }
 function targetMF(){
@@ -1701,7 +1762,7 @@ function insertTpl(tpl){
 /* ---------- Recherche de symbole par son nom (Ctrl+K) ---------- */
 const deacc=s=>s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');
 let srchSel=0, srchRes=[], srchMF=null;
-function openSearch(){
+function openSearch(){ emit('search');
   srchMF = (lastMF && document.body.contains(lastMF)) ? lastMF : null;
   const inp=document.getElementById('srchIn'); inp.value=''; doSearch();
   openDlg('srchDlg'); inp.focus();
@@ -1713,6 +1774,8 @@ function doSearch(){
       let sc= !q?1 : deacc(s.name).startsWith(q)?3 : hay.split(/\s+/).some(w=>w.startsWith(q))?2 : hay.includes(q)?1:0;
       if(sc && s.lvl<=L) sc+=0.5; return {s,sc}; })
     .filter(x=>x.sc>0).sort((a,b)=>b.sc-a.sc).slice(0,40).map(x=>x.s);
+  if(q.length>=3){ const words=q.split(/\s+/).filter(w=>w.length>=3&&!['comment','faire','pour','avec','une','les','des','mon','mes','est','que'].includes(w));
+    if(words.length) helpIndex().filter(x=>words.every(w=>x.hay.includes(w))).slice(0,6).forEach(x=>srchRes.push(x)); }
   if(q && !isExam()) state.pages.forEach(p=>{ if(p.id!==state.current && deacc((p.title||'')+' '+(p.subject||'')).includes(q)) srchRes.unshift({page:p.id,sym:'📄',name:p.title||'Sans titre',cat:p.subject||'Page',kw:''}); });
   srchSel=0; paintSearch();
 }
@@ -1729,10 +1792,11 @@ function paintSearch(){
 }
 function pickSearch(i){
   const s=srchRes[i]; document.getElementById('srchDlg').classList.remove('open'); if(!s) return;
+  if(s.help!==undefined){ showHelpRow(s.help); return; }
   if(s.page){ state.current=s.page; renderPage(); scheduleSave(false); const R=page().rows; if(R.length) focusRow(R[R.length-1].id,'end'); return; }
   if(srchMF && document.body.contains(srchMF)){ lastMF=srchMF; const r=srchMF.closest('.row'); if(r) setCurrent(r.dataset.id); }
   insertTpl(s.tpl);
-  if(s.key && !NATIVE.has(s.key)) toast('Astuce : la prochaine fois, tape « '+s.key+' »');
+  if(s.key && !NATIVE.has(s.key) && state.settings.tips!==false) toast('Astuce : la prochaine fois, tape « '+s.key+' »');
 }
 on('srchIn','input',doSearch);
 on('srchIn','keydown',e=>{
@@ -1742,10 +1806,11 @@ on('srchIn','keydown',e=>{
 });
 
 /* ============ Aide ============ */
-function renderHelp(){
+function helpHTML(){
   const L=state.settings.level;
   const rows=(arr)=>'<table>'+arr.map(([a,b])=>'<tr><td>'+a+'</td><td>'+b+'</td></tr>').join('')+'</table>';
-  let h='<h3>Se déplacer et organiser</h3>'+rows([
+  let h='<p style="margin:.2em 0 .6em"><button class="btn primary" data-help="tour">▶ Visite guidée (2 minutes)</button> <span style="font-size:.75em;color:var(--muted)">Astuce : <kbd>Ctrl</kbd>+<kbd>K</kbd> trouve aussi les réponses de cette aide (« supprimer », « enregistrer »…)</span></p>';
+  h+='<h3>Se déplacer et organiser</h3>'+rows([
     ['<kbd>Entrée</kbd>','nouvelle ligne du même type'],
     ['<kbd>Maj</kbd>+<kbd>Entrée</kbd>','nouvelle ligne de l\u2019autre type (texte ⇄ calcul)'],
     ['<kbd>Ctrl</kbd>+<kbd>D</kbd>','<b>recopier la ligne</b> en dessous — idéal pour résoudre une équation étape par étape'],
@@ -1753,6 +1818,8 @@ function renderHelp(){
     ['<kbd>↑</kbd> <kbd>↓</kbd>','ligne précédente / suivante'],
     ['<kbd>⌫</kbd> sur une ligne vide','supprimer la ligne'],
     ['<kbd>Ctrl</kbd>+<kbd>Maj</kbd>+<kbd>⌫</kbd> ou 🗑 à droite','supprimer n’importe quel bloc (graphique, opération posée…). « Annuler » le remet pendant quelques secondes'],
+    ['Clic droit sur une ligne, ou toucher l’icône à gauche (tablette)','le menu de la ligne : monter, descendre, dupliquer, changer en texte ou en calcul, supprimer'],
+    ['<kbd>F4</kbd> ou 📚 Pages','la liste de tes pages, rangées par matière : ouvrir, chercher, ranger, supprimer'],
     ['<kbd>Ctrl</kbd>+<kbd>Entrée</kbd>','calculer la ligne (nombres seulement) et écrire le résultat'],
     ['# au début d\u2019un texte','en faire un titre'],
   ]);
@@ -1812,7 +1879,7 @@ function renderHelp(){
     ['<kbd>F9</kbd>','<b>vérifier mes étapes</b> : MathDys signale la ligne où une erreur s\u2019est glissée (équations, inéquations, calculs, lignes qui commencent par « = »), sans donner la réponse'],
     ['Ctrl+K → « Pythagore », « discriminant »…','l\u2019aide-mémoire : les formules du programme, à insérer en un clic. Ctrl+K retrouve aussi tes pages'],
     ['Réglages → Mes abréviations','tes propres raccourcis, par exemple <code>ssi = si et seulement si</code>'],
-    ['Page → 📁 Ranger dans une matière','classer tes pages par matière ou par chapitre'],
+    ['📚 Pages → 📁 à côté d’une page','classer tes pages par matière ou par chapitre'],
     ['<kbd>F2</kbd>','lire la ligne à voix haute, en français (<kbd>Maj</kbd>+<kbd>F2</kbd> : toute la page). <kbd>F2</kbd> encore pour arrêter'],
     ['<kbd>F8</kbd>','mode concentration : seule la ligne en cours reste bien visible'],
     ['Réglages → Réglages tout prêts','dyspraxie, dyslexie, dyscalculie : un point de départ à ajuster'],
@@ -1825,23 +1892,43 @@ function renderHelp(){
   h+='<h3>Pour les professeurs : fiches d\u2019exercices</h3>'+rows([
     ['Réglages → Mode professeur','survole une ligne et clique sur 🔓 pour en faire une ligne d\u2019<b>énoncé</b> protégée (🔒), puis enregistre la fiche (Ctrl+S) et donne le fichier aux élèves'],
     ['Côté élève','il ouvre la fiche (Ctrl+O) : l\u2019énoncé ne peut être ni modifié ni supprimé, il écrit ses réponses dessous. Ctrl+S crée <b>sa</b> copie « … - mes réponses », sans écraser la fiche'],
-    ['Exporter… → Word','pour rendre un devoir sur l\u2019ENT si le PDF n\u2019est pas accepté'],
+    ['📁 Fichier → Exporter pour Word','pour rendre un devoir sur l’ENT si le PDF n’est pas accepté'],
   ]);
   h+='<h3>Enregistrer et ouvrir</h3>'+rows([
-    ['<kbd>Ctrl</kbd>+<kbd>S</kbd>','enregistrer le cahier dans un fichier <b>.mathdys</b> sur ton ordinateur. Les fois suivantes, le même fichier est mis à jour (Chrome, Edge) ou un nouveau est téléchargé (Firefox, Safari)'],
+    ['<kbd>Ctrl</kbd>+<kbd>S</kbd>','enregistrer la page dans un fichier <b>.mathdys</b> sur ton ordinateur. Les fois suivantes, le même fichier est mis à jour (Chrome, Edge) ou un nouveau est téléchargé (Firefox, Safari)'],
     ['<kbd>Ctrl</kbd>+<kbd>Maj</kbd>+<kbd>S</kbd>','enregistrer sous un autre nom'],
-    ['Exporter… → 💾 Sauvegarder tout le cahier','toutes tes pages dans un seul fichier, à garder sur une clé USB ou dans OneDrive. Pour les retrouver : 📂 Ouvrir ce fichier (rien n\u2019est effacé)'],
-    ['<kbd>Ctrl</kbd>+<kbd>O</kbd>','ouvrir un cahier .mathdys — ou glisse le fichier sur la page'],
+    ['📁 Fichier → 🗂 Sauvegarder tout le cahier','toutes tes pages dans un seul fichier, à garder sur une clé USB ou dans OneDrive. Pour les retrouver : 📂 Ouvrir ce fichier (rien n\u2019est effacé)'],
+    ['<kbd>Ctrl</kbd>+<kbd>O</kbd>','ouvrir une page .mathdys ou une sauvegarde — ou glisse le fichier sur la page'],
     ['Pastille rouge en haut','il y a des changements pas encore enregistrés dans le fichier'],
-    ['Sur plusieurs appareils','enregistre tes cahiers dans ton dossier OneDrive, Google Drive ou celui de l\u2019ENT : tu les retrouves partout, sans compte MathDys'],
-    ['<kbd>Ctrl</kbd>+<kbd>Z</kbd> / <kbd>Ctrl</kbd>+<kbd>Y</kbd>','annuler / rétablir (dans une formule, puis dans tout le cahier). Les boutons ↶ ↷ annulent toujours dans le cahier'],
+    ['Sur plusieurs appareils','enregistre tes pages dans ton dossier OneDrive, Google Drive ou celui de l\u2019ENT : tu les retrouves partout, sans compte MathDys'],
+    ['<kbd>Ctrl</kbd>+<kbd>Z</kbd> / <kbd>Ctrl</kbd>+<kbd>Y</kbd>','annuler / rétablir (dans une formule, puis dans toute la page). Les boutons ↶ Annuler et ↷ Rétablir agissent toujours sur la page'],
     ['<kbd>Alt</kbd>+<kbd>↑</kbd> / <kbd>Alt</kbd>+<kbd>↓</kbd>','monter / descendre le bloc (ou ▲▼ à droite)'],
   ]);
+  h+='<h3>Les mots de MathDys</h3>'+rows([
+    ['Cahier','toutes tes pages, gardées dans ce navigateur (📚 Pages)'],
+    ['Page','un cours ou un exercice. Quand tu l’enregistres (Ctrl+S), elle devient un fichier .mathdys'],
+    ['Ligne','une ligne de calcul (bleue) ou de texte'],
+    ['Bloc','un élément plus grand : graphique, opération posée, arbre, tableau, image'],
+    ['Sauvegarde','un seul fichier qui contient tout le cahier (📁 Fichier → Sauvegarder tout le cahier)'],
+    ['Fiche','une page préparée par le professeur, avec un énoncé protégé'],
+    ['Énoncé','les lignes 🔒 d’une fiche : on peut les lire, pas les modifier'],
+  ]);
   h+='<p style="font-size:.75em;margin-top:1em;color:var(--muted)">MathDys version '+APP_VERSION+'. Pour l\u2019avoir même sans Internet : ouvre le site une fois connecté, puis installe-le (icône ⊕ dans la barre d\u2019adresse de Chrome ou Edge).</p>';
-  h+='<p style="font-size:.75em;margin-top:1em">Un bug ? Une idée ? Bouton <b>🐞 Signaler un bug</b> en bas du cahier, ou Ctrl+K → « bug ».</p>';
+  h+='<p style="font-size:.75em;margin-top:1em">Un bug ? Une idée ? Bouton <b>🐞 Signaler un bug</b> en bas de la page, ou Ctrl+K → « bug ».</p>';
   h+='<p style="font-size:.75em;margin-top:1em">Une idée, un bug ? Écris à <a href="mailto:git.public@protonmail.com?subject=MathDys">git.public@protonmail.com</a></p>';
-  document.getElementById('helpBody').innerHTML=h;
+  return h;
 }
+function renderHelp(){ document.getElementById('helpBody').innerHTML=helpHTML(); }
+document.getElementById('helpBody').addEventListener('click',e=>{ const b=e.target.closest('[data-help=tour]'); if(b) startTour(); });
+// les questions de l'aide, pour les retrouver avec Ctrl+K
+let HELPIDX=null, HELPLV=null;
+function helpIndex(){ if(HELPIDX && HELPLV===state.settings.level) return HELPIDX; HELPLV=state.settings.level;
+  const d=document.createElement('div'); d.innerHTML=helpHTML();
+  HELPIDX=[...d.querySelectorAll('tr')].map((tr,i)=>{ const td=tr.querySelectorAll('td'); const k=(td[0]&&td[0].textContent||'').replace(/\s+/g,' ').trim(), v=(td[1]&&td[1].textContent||'').replace(/\s+/g,' ').trim();
+    return {help:i, sym:'❓', name:v.length>110?v.slice(0,108)+'…':v, cat:'Aide · '+(k.length>40?k.slice(0,38)+'…':k), hay:deacc(k+' '+v)}; });
+  return HELPIDX; }
+function showHelpRow(i){ openDlg('helpDlg'); const tr=document.querySelectorAll('#helpBody tr')[i]; if(!tr) return;
+  tr.classList.add('hl'); tr.scrollIntoView({block:'center'}); setTimeout(()=>tr.classList.remove('hl'),4000); }
 
 /* ============ Fenêtres, réglages, pages ============ */
 function openDlg(id){ if(id==='helpDlg') renderHelp(); const o=document.getElementById(id); o.classList.add('open');
@@ -1874,25 +1961,34 @@ function syncSettingsUI(){ BOUND.forEach(([el,key])=>{ if(el.type==='checkbox') 
 document.querySelectorAll('[data-preset]').forEach(b=>b.addEventListener('click',()=>applyPreset(b.dataset.preset)));
 const bind=(id,key,conv,ev)=>{ const el=document.getElementById(id); BOUND.push([el,key]);
   if(el.type==='checkbox') el.checked=!!state.settings[key]; else el.value=state.settings[key];
-  el.addEventListener(ev||'input',()=>{ state.settings[key]= el.type==='checkbox'?el.checked:conv(el.value); applySettings(); if(key==='labels'||key==='check') renderPage(); if(key==='parens') colorAllParens(); if(key==='simple') renderTools(); if(key==='vkb'||key==='teacher'||key==='abbr') renderPage(); if(key==='digits') colorAllParens(); if(key==='teacher') toast(state.settings.teacher?'Mode professeur : survole une ligne et clique sur 🔓 pour la protéger':'Mode professeur désactivé'); scheduleSave(false); }); };
+  el.addEventListener(ev||'input',()=>{ state.settings[key]= el.type==='checkbox'?el.checked:conv(el.value); applySettings(); if(key==='labels'||key==='check') renderPage(); if(key==='parens') colorAllParens(); if(key==='simple') renderTools(); if(key==='vkb'||key==='teacher'||key==='abbr') renderPage(); if(key==='digits') colorAllParens(); if(['fs','lh','font','theme','parens','digits'].includes(key)) paintPreview(); if(key==='teacher') toast(state.settings.teacher?'Mode professeur : survole une ligne et clique sur 🔓 pour la protéger':'Mode professeur désactivé'); scheduleSave(false); }); };
 bind('sFs','fs',Number); bind('sLh','lh',Number); bind('sFont','font',String,'change'); bind('sTheme','theme',String,'change');
-bind('sName','name',String); bind('sFocus','focus',Boolean,'change'); bind('sParens','parens',Boolean,'change'); bind('sRate','rate',Number); bind('sSimple','simple',Boolean,'change'); bind('sAbbr','abbr',String,'change'); bind('sDigits','digits',Boolean,'change'); bind('sTeacher','teacher',Boolean,'change'); bind('sVkb','vkb',String,'change'); bind('sAlign','align',Boolean,'change'); bind('sLabels','labels',Boolean,'change'); bind('sCheck','check',Boolean,'change');
+bind('sName','name',String); bind('sFocus','focus',Boolean,'change'); bind('sParens','parens',Boolean,'change'); bind('sRate','rate',Number); bind('sSimple','simple',Boolean,'change'); bind('sAbbr','abbr',String,'change'); bind('sDigits','digits',Boolean,'change'); bind('sTeacher','teacher',Boolean,'change'); bind('sVkb','vkb',String,'change'); bind('sAlign','align',Boolean,'change'); bind('sLabels','labels',Boolean,'change'); bind('sCheck','check',Boolean,'change'); bind('sTips','tips',Boolean,'change');
 on('levelSel','change',e=>{ state.settings.level=e.target.value; renderTools(); scheduleSave(false); toast('Niveau : '+e.target.selectedOptions[0].textContent); });
-on('settingsBtn','click',()=>openDlg('setDlg'));
+on('settingsBtn','click',()=>{ openDlg('setDlg'); paintPreview(); });
+function setTab(t){ document.querySelectorAll('#setDlg .stab-btn').forEach(b=>{ const on=b.dataset.tab===t; b.classList.toggle('on',on); b.setAttribute('aria-selected',String(on)); b.tabIndex=on?0:-1; });
+  document.querySelectorAll('#setDlg .stab').forEach(p=>p.hidden=p.dataset.tab!==t); }
+document.querySelectorAll('#setDlg .stab-btn').forEach(b=>{ b.addEventListener('click',()=>setTab(b.dataset.tab));
+  b.addEventListener('keydown',e=>{ if(e.key!=='ArrowRight'&&e.key!=='ArrowLeft') return; e.preventDefault(); const all=[...document.querySelectorAll('#setDlg .stab-btn')]; const j=(all.indexOf(b)+(e.key==='ArrowRight'?1:-1)+all.length)%all.length; all[j].focus(); setTab(all[j].dataset.tab); }); });
+// aperçu en direct : la même formule que dans le cahier, avec tes réglages
+function paintPreview(){ const box=document.getElementById('pvMath'); if(!box) return;
+  if(MFE && !box.querySelector('math-field')){ const mf=document.createElement('math-field'); mf.setAttribute('read-only',''); mf.setAttribute('aria-label','Aperçu d’une formule'); mf.tabIndex=-1; box.append(mf);
+    try{ mf.readOnly=true; }catch(e){} mf.value='\\frac{3}{4}+2\\times(x+(5-1))=12'; }
+  else if(!MFE) box.textContent='3/4 + 2 × (x + (5 − 1)) = 12';
+  const mf=box.querySelector('math-field'); if(mf) requestAnimationFrame(()=>{ try{ colorParens(mf); }catch(e){} }); }
 on('helpBtn','click',()=>openDlg('helpDlg'));
-on('newPage','click',()=>{ const p=newPage(); if(page()&&page().subject) p.subject=page().subject; state.pages.push(p); state.current=p.id; renderPage(); scheduleSave(false); focusRow(p.rows[0].id,'end'); });
-on('pageSel','change',e=>{
-  const v=e.target.value;
-  if(v==='__subj'){ e.target.value=state.current;
-    ask('Dans quelle matière ranger « '+(page().title||'Sans titre')+' » ?',val=>{ page().subject=(val||'').trim().slice(0,40)||undefined; renderPageList(); scheduleSave(); },
-      {input:true,value:page().subject||'',placeholder:'Maths, Physique, Chapitre 3…',list:subjects(),ok:'Ranger'});
-    return; }
-  if(v==='__del'){ e.target.value=state.current;
-    ask('Supprimer la page « '+(page().title||'Sans titre')+' » ?',()=>{ state.pages=state.pages.filter(p=>p.id!==state.current); if(!state.pages.length) state.pages.push(newPage()); state.current=state.pages[0].id; renderPage(); scheduleSave(false); });
-    return; }
-  state.current=v; renderPage(); scheduleSave(false);
-});
-on('pageTitle','input',e=>{ page().title=e.target.value; const o=document.querySelector('#pageSel option[value="'+state.current+'"]'); if(o) o.textContent=e.target.value||'Sans titre'; scheduleSave(); });
+on('newPage','click',()=>{ if(isExam()) return examRefused('Une nouvelle page'); const p=newPage(); if(page()&&page().subject) p.subject=page().subject; state.pages.push(p); state.current=p.id; renderPage(); scheduleSave(false); if(!wide()) setPages(false); focusRow(p.rows[0].id,'end'); toast('Nouvelle page : donne-lui un nom en haut'); });
+on('pagesBtn','click',()=>setPages(document.getElementById('pagesPanel').hidden));
+on('pagesClose','click',()=>setPages(false));
+on('pagesFind','input',e=>{ pagesQ=e.target.value; paintPages(); });
+on('pagesFind','keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); const b=document.querySelector('#pagesList .pp-go'); if(b) b.click(); }
+  if(e.key==='ArrowDown'){ e.preventDefault(); const b=document.querySelector('#pagesList .pp-go'); if(b) b.focus(); } });
+document.getElementById('pagesList').addEventListener('keydown',e=>{ if(e.key!=='ArrowDown'&&e.key!=='ArrowUp') return; const all=[...document.querySelectorAll('#pagesList .pp-go')]; const i=all.indexOf(document.activeElement); if(i<0) return; e.preventDefault();
+  const j=i+(e.key==='ArrowDown'?1:-1); if(j<0) document.getElementById('pagesFind').focus(); else if(all[j]) all[j].focus(); });
+document.addEventListener('pointerdown',e=>{ const P=document.getElementById('pagesPanel');
+  if(!P.hidden && !wide() && !P.contains(e.target) && !e.target.closest('#pagesBtn') && !e.target.closest('.overlay')) setPages(false);
+  if(!e.target.closest('.menu') && !e.target.closest('#fileBtn')) closeMenus(false); },true);
+on('pageTitle','input',e=>{ page().title=e.target.value; paintPages(); scheduleSave(); });
 on('pageTitle','keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); const r=page().rows[0]; if(r) focusRow(r.id,'end'); } });
 function preparePrint(){
   const ph=document.getElementById('printhead');
@@ -1907,7 +2003,6 @@ function preparePrint(){
 }
 window.addEventListener('beforeprint',preparePrint);
 function doPrint(){ preparePrint(); try{ window.print(); }catch(e){ toast('Impression impossible ici'); } }
-on('printBtn','click',doPrint);
 /* ============ Export : texte lisible, LaTeX, Word / LibreOffice ============ */
 const SUP={'0':'⁰','1':'¹','2':'²','3':'³','4':'⁴','5':'⁵','6':'⁶','7':'⁷','8':'⁸','9':'⁹','+':'⁺','-':'⁻','n':'ⁿ','x':'ˣ','i':'ⁱ'};
 const SUB={'0':'₀','1':'₁','2':'₂','3':'₃','4':'₄','5':'₅','6':'₆','7':'₇','8':'₈','9':'₉','+':'₊','-':'₋','n':'ₙ','k':'ₖ','p':'ₚ','i':'ᵢ'};
@@ -1991,17 +2086,34 @@ function exportDoc(mathml){
   document.body.append(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(url),3000);
   toast(mathml?'Fichier Word créé : les formules deviennent des équations Word':'Fichier créé : les formules sont écrites en texte simple');
 }
-on('exportSel','change',e=>{
-  const v=e.target.value; e.target.value='';
-  if(v==='txt') copyPage(false); else if(v==='latex') copyPage(true);
-  else if(v==='all') saveAll();
-  else if(v==='word') exportDoc(true); else if(v==='odt') exportDoc(false); else if(v==='pdf') doPrint();
-});
+/* ---------- Menu « Fichier » et menus en général ---------- */
+function placeMenu(m,r,right){ m.hidden=false; const w=m.offsetWidth, h=m.offsetHeight;
+  let x=right?r.right-w:r.left, y=r.bottom+4; x=Math.max(6,Math.min(x,innerWidth-w-6)); if(y+h>innerHeight-6) y=Math.max(6,r.top-h-4);
+  m.style.left=x+'px'; m.style.top=y+'px'; }
+let menuReturn=null;
+function openMenu(m,anchor,right,ret){ closeMenus(false); placeMenu(m,anchor.getBoundingClientRect(),right); menuReturn=ret||null;
+  const b=document.querySelector('[aria-controls="'+m.id+'"]'); if(b) b.setAttribute('aria-expanded','true');
+  const f=m.querySelector('button:not(:disabled)'); if(f) f.focus(); }
+function closeMenus(refocus){ let had=false; document.querySelectorAll('.menu').forEach(m=>{ if(!m.hidden){ had=true; m.hidden=true; const b=document.querySelector('[aria-controls="'+m.id+'"]'); if(b) b.setAttribute('aria-expanded','false'); } });
+  if(had && refocus){ if(menuReturn) menuReturn(); else if(currentId) focusRow(currentId,'end'); } menuReturn=null; return had; }
+document.querySelectorAll('.menu').forEach(m=>m.addEventListener('keydown',e=>{
+  const all=[...m.querySelectorAll('button:not(:disabled)')]; const i=all.indexOf(document.activeElement);
+  if(e.key==='ArrowDown'||e.key==='ArrowUp'){ e.preventDefault(); e.stopPropagation(); const j=(i+(e.key==='ArrowDown'?1:-1)+all.length)%all.length; all[j].focus(); }
+  else if(e.key==='Home'||e.key==='End'){ e.preventDefault(); all[e.key==='Home'?0:all.length-1].focus(); }
+  else if(e.key==='Tab'){ closeMenus(false); }
+}));
+on('fileBtn','click',e=>{ const m=document.getElementById('fileMenu'); if(!m.hidden){ closeMenus(false); return; } openMenu(m,e.currentTarget,true,()=>document.getElementById('fileBtn').focus()); });
+document.getElementById('fileMenu').addEventListener('click',e=>{ const b=e.target.closest('button[data-act]'); if(!b||b.disabled) return; closeMenus(false); fileAct(b.dataset.act); });
+function fileAct(v){
+  if(v==='open') openFile(); else if(v==='saveas') saveFile(true); else if(v==='all') saveAll();
+  else if(v==='pdf') doPrint(); else if(v==='word') exportDoc(true); else if(v==='odt') exportDoc(false);
+  else if(v==='txt') copyPage(false); else if(v==='latex') copyPage(true);
+}
 
 /* ============ Fichiers sur l'ordinateur (aucun compte, aucun serveur) ============ */
 const FILE_EXT='.mathdys';
 const handles=new Map(); // page → fichier ouvert (Chrome/Edge), pour réenregistrer au même endroit
-const FTYPES=[{description:'Cahier MathDys',accept:{'application/json':[FILE_EXT]}}];
+const FTYPES=[{description:'Page MathDys',accept:{'application/json':[FILE_EXT]}}];
 const safeName=t=>((t||'cahier').replace(/[\\/:*?"<>|]+/g,'-').replace(/\s+/g,' ').trim().slice(0,80)||'cahier')+FILE_EXT;
 function pageToFile(p){ return JSON.stringify({app:'MathDys',format:1,saved:new Date().toISOString(),title:p.title,rows:p.rows}); }
 async function saveFile(as){
@@ -2061,7 +2173,7 @@ const KNOWN=Object.keys(BLOCKS);
 function loadFileText(txt,name,handle){
   let d=null; try{ d=JSON.parse(txt); }catch(e){}
   if(d && d.app==='MathDys' && d.kind==='backup' && Array.isArray(d.pages)){ if(isExam()) return examRefused('La restauration'); restoreAll(d,name); return; }
-  if(!d || d.app!=='MathDys' || !Array.isArray(d.rows)){ toast('« '+name+' » n\u2019est pas un cahier MathDys'); return; }
+  if(!d || d.app!=='MathDys' || !Array.isArray(d.rows)){ toast('« '+name+' » n’est pas un fichier MathDys'); return; }
   if(isExam() && !pendingExam) return examRefused('L\u2019ouverture d\u2019un fichier');
   const rows=cleanRows(d.rows).map(r=>Object.assign({},r,{id:uid()}));
   const title=(typeof d.title==='string'&&d.title)||name.replace(/\.[^.]+$/,'');
@@ -2084,7 +2196,6 @@ function loadFileText(txt,name,handle){
   if(fiche) toast('Fiche d\u2019exercice : l\u2019énoncé est protégé. Écris tes réponses, puis Ctrl+S pour enregistrer TA copie.','OK',()=>{});
   else toast(keptCopy?'« '+name+' » ouvert dans une nouvelle page (ta version modifiée est gardée)':'« '+name+' » ouvert');
 }
-on('openBtn','click',openFile);
 on('saveBtn','click',()=>saveFile(false));
 on('fileIn','change',async e=>{ const f=e.target.files[0]; if(f) loadFileText(await f.text(), f.name, null); e.target.value=''; });
 let dragN=0; const dropEl=document.getElementById('drop');
@@ -2104,13 +2215,98 @@ window.addEventListener('paste',async e=>{
 },true);
 window.addEventListener('beforeunload',e=>{ if(state.pages.some(p=>p.dirty && p.rows.some(r=>!isEmpty(r)))){ e.preventDefault(); e.returnValue=''; } });
 
-let toastT=null;
+let toastT=null, toastLeft=0, toastAt=0;
+const toastEl=document.getElementById('toast');
+function hideToast(){ clearTimeout(toastT); toastEl.classList.remove('show','act'); }
+function armToast(ms){ clearTimeout(toastT); toastLeft=ms; toastAt=Date.now(); toastT=setTimeout(hideToast,ms); }
+// le temps d'affichage dépend de la longueur du message : on a le temps de lire, même lentement
+const toastMs=(t,act)=>Math.min(12000,Math.max(3500,1500+String(t).length*60))+(act?3000:0);
 function toast(t,actLabel,actFn){
-  const el=document.getElementById('toast'); el.textContent=t; el.classList.remove('act');
+  const el=toastEl; el.innerHTML=''; const sp=document.createElement('span'); sp.className='t-msg'; sp.textContent=t; el.append(sp);
   if(actLabel){ const b=document.createElement('button'); b.textContent=actLabel;
-    b.addEventListener('click',()=>{ el.classList.remove('show','act'); actFn(); }); el.append(b); el.classList.add('act'); }
-  el.classList.add('show'); clearTimeout(toastT);
-  toastT=setTimeout(()=>el.classList.remove('show','act'), actLabel?6000:1800);
+    b.addEventListener('click',()=>{ hideToast(); actFn(); }); el.append(b); }
+  const say=document.createElement('button'); say.className='t-say'; say.textContent='🔊'; say.title='Lire le message à voix haute'; say.setAttribute('aria-label','Lire le message à voix haute');
+  say.addEventListener('click',()=>{ armToast(Math.max(toastLeft,8000)); speak(t); });
+  const x=document.createElement('button'); x.className='t-x'; x.textContent='✕'; x.title='Fermer'; x.setAttribute('aria-label','Fermer le message'); x.addEventListener('click',hideToast);
+  el.append(say,x); el.classList.add('show','act'); armToast(toastMs(t,actLabel));
+}
+toastEl.addEventListener('mouseenter',()=>{ if(!toastEl.classList.contains('show')) return; clearTimeout(toastT); toastLeft=Math.max(0,toastLeft-(Date.now()-toastAt)); });
+toastEl.addEventListener('mouseleave',()=>{ if(toastEl.classList.contains('show')) armToast(Math.max(2000,toastLeft)); });
+toastEl.addEventListener('mousedown',e=>e.preventDefault());
+
+/* ============ Visite guidée et astuces ============ */
+const BUS={};
+function emit(n){ (BUS[n]||[]).slice().forEach(f=>{ try{ f(); }catch(e){} }); }
+function onBus(n,f){ (BUS[n]=BUS[n]||[]).push(f); return ()=>{ BUS[n]=(BUS[n]||[]).filter(g=>g!==f); }; }
+const nFrac=()=>page().rows.reduce((k,r)=>k+(r.type==='math'?((r.value||'').match(/\\frac/g)||[]).length:0),0);
+const TOUR=[
+  {t:'Écrire une fraction', d:'Sur la ligne, tape <kbd>3</kbd> puis <kbd>/</kbd> puis <kbd>4</kbd>. La fraction se fait toute seule. <kbd>→</kbd> pour en sortir.',
+    start:()=>nFrac(), done:n=>nFrac()>n},
+  {t:'Passer à la ligne', d:'Appuie sur <kbd>Entrée</kbd> : une nouvelle ligne de calcul apparaît en dessous.', start:()=>page().rows.length, done:n=>page().rows.length>n},
+  {t:'Recopier une ligne', d:'Pour résoudre étape par étape, recopie la ligne avec <kbd>Ctrl</kbd>+<kbd>D</kbd> (ou le bouton « Dupliquer »), puis change ce qui bouge.', ev:'dup'},
+  {t:'Vérifier ses étapes', d:'Appuie sur <kbd>F9</kbd> (ou « ✓ Vérifier ») : MathDys montre la ligne où une erreur s’est glissée, sans donner la réponse.', ev:'check'},
+  {t:'Trouver un symbole', d:'Appuie sur <kbd>Ctrl</kbd>+<kbd>K</kbd> (ou « 🔍 Symbole ») et tape son nom : « infini », « racine », « union »…', ev:'search'},
+];
+let tourBox=null, tourOff=[], tourPoll=null;
+function endTour(){ tourOff.forEach(f=>f()); tourOff=[]; clearInterval(tourPoll); if(tourBox){ tourBox.remove(); tourBox=null; }
+  if(!state.seenHelp){ state.seenHelp=true; scheduleSave(false); } }
+function startTour(){
+  if(isExam()) return; endTour(); document.querySelectorAll('.overlay.open').forEach(o=>o.classList.remove('open'));
+  const box=document.createElement('div'); box.className='tour'; box.setAttribute('role','region'); box.setAttribute('aria-label','Visite guidée'); box.setAttribute('aria-live','polite');
+  document.body.append(box); tourBox=box; box.addEventListener('mousedown',e=>{ if(e.target.tagName==='BUTTON') e.preventDefault(); });
+  const show=i=>{ tourOff.forEach(f=>f()); tourOff=[]; clearInterval(tourPoll);
+    if(i>=TOUR.length){ box.innerHTML='<div class="t-steps">Visite terminée</div><h3>🎉 Tu connais l’essentiel !</h3><p>Pense à <kbd>Ctrl</kbd>+<kbd>S</kbd> pour enregistrer ta page dans un fichier. Toute l’aide est dans <kbd>F1</kbd>.</p><div class="foot"><span></span><button class="btn primary" data-t="end">Terminer</button></div>'; box.querySelector('[data-t=end]').focus(); return; }
+    const S=TOUR[i]; box.innerHTML='<div class="t-steps">Visite guidée · étape '+(i+1)+' sur '+TOUR.length+'</div><h3>'+S.t+'</h3><p>'+S.d+'</p><div class="foot"><button class="btn" data-t="end">Arrêter la visite</button><button class="btn" data-t="next">Passer cette étape ›</button></div>';
+    let fired=false; const win=()=>{ if(fired) return; fired=true; clearInterval(tourPoll); tourOff.forEach(f=>f()); tourOff=[];
+      const h=box.querySelector('h3'); if(h) h.innerHTML='<span class="t-done">✓ Bravo !</span> '+S.t; setTimeout(()=>{ if(tourBox===box) show(i+1); },1300); };
+    if(S.ev) tourOff.push(onBus(S.ev,win));
+    if(S.done){ const n=S.start?S.start():null; tourPoll=setInterval(()=>{ try{ if(S.done(n)) win(); }catch(e){} },400); }
+  };
+  let step=0; box.addEventListener('click',e=>{ const t=e.target.closest('[data-t]'); if(!t) return;
+    if(t.dataset.t==='end'){ endTour(); if(currentId) focusRow(currentId,'end'); }
+    else { step=+(box.querySelector('.t-steps').textContent.match(/étape (\d+)/)||[0,1])[1]; show(step); if(currentId) focusRow(currentId,'end'); } });
+  show(0); if(currentId) focusRow(currentId,'end');
+}
+// astuces : chacune n'est montrée qu'une fois, et jamais deux de suite trop vite
+let tipLast=0; const clicks={};
+function tip(id,text){ const s=state.settings; if(s.tips===false||isExam()||tourBox) return;
+  s.tipsSeen=Array.isArray(s.tipsSeen)?s.tipsSeen:[]; if(s.tipsSeen.includes(id)||Date.now()-tipLast<90e3) return;
+  s.tipsSeen.push(id); tipLast=Date.now(); scheduleSave(false); toast('💡 Astuce : '+text,'Compris',()=>{}); }
+function tipClick(s){ if(!s.key) return; clicks[s.sym]=(clicks[s.sym]||0)+1; if(clicks[s.sym]<3) return;
+  tip('k:'+s.key, s.tpl.indexOf('\\frac')>=0 ? 'pas besoin du bouton, tape directement 3/4 : la fraction se fait toute seule.' : 'pour « '+s.name+' », tu peux aussi taper « '+s.key+' » sans quitter le clavier.'); }
+function tipRetype(row){ const v=(row.value||'').replace(/\s/g,''); if(v.length<6||DUPS.has(row)) return;
+  const R=page().rows, i=R.indexOf(row); const prev=i>0?R[i-1]:null; if(!prev||prev.type!=='math') return;
+  if((prev.value||'').replace(/\s/g,'').startsWith(v)) tip('dup','au lieu de réécrire la ligne, appuie sur Ctrl+D : elle est recopiée en dessous, tu n’as plus qu’à la modifier.'); }
+function updEmpty(){ const h=document.getElementById('emptyHint'); if(!h) return; const R=page().rows;
+  h.hidden=!(R.length<=2 && R.every(isEmpty) && !isExam()); }
+on('emptyTour','click',e=>{ e.preventDefault(); startTour(); });
+on('tourAgain','click',()=>{ document.getElementById('setDlg').classList.remove('open'); startTour(); });
+
+/* ---------- Flèche « plus d'outils » sur les barres qui défilent (petits écrans) ---------- */
+function updMore(){ ['tools','items','cats'].forEach(id=>{ const b=document.getElementById(id); if(!b) return;
+    let h=b.querySelector(':scope > .more-hint');
+    if(!h){ h=document.createElement('button'); h.className='more-hint'; h.textContent='›'; h.tabIndex=-1; h.title='Voir plus d’outils'; h.setAttribute('aria-hidden','true');
+      h.addEventListener('mousedown',e=>e.preventDefault()); h.addEventListener('click',()=>b.scrollBy({left:b.clientWidth*.7,behavior:'smooth'})); b.append(h);
+      if(!b._moreBound){ b._moreBound=true; b.addEventListener('scroll',()=>updMore(),{passive:true}); } }
+    const more=b.scrollWidth>b.clientWidth+4 && b.scrollLeft+b.clientWidth<b.scrollWidth-8; b.classList.toggle('has-more',more); }); }
+window.addEventListener('resize',()=>{ clearTimeout(updMore._t); updMore._t=setTimeout(updMore,150); });
+
+/* ---------- Menu d'une ligne (tablette : toucher l'icône à gauche ; souris : clic droit) ---------- */
+function openRowMenu(id,anchor){
+  const r=rowById(id); if(!r) return; const m=document.getElementById('rowMenu'); m.innerHTML='';
+  const lockedS=r.locked && !state.settings.teacher, i=idx(id), n=page().rows.length;
+  const it=(label,kbd,fn,dis)=>{ const b=document.createElement('button'); b.setAttribute('role','menuitem'); b.innerHTML='<span></span>'+(kbd?'<kbd>'+kbd+'</kbd>':''); b.firstChild.textContent=label; b.disabled=!!dis;
+    b.addEventListener('mousedown',e=>e.preventDefault()); b.addEventListener('click',()=>{ closeMenus(false); fn(); }); m.append(b); };
+  if(lockedS){ const p=document.createElement('div'); p.className='op-msg'; p.style.padding='.3em .7em'; p.textContent='🔒 Ligne d’énoncé protégée'; m.append(p); }
+  it('▲ Monter','Alt+↑',()=>moveRow(id,-1),lockedS||i<=0);
+  it('▼ Descendre','Alt+↓',()=>moveRow(id,1),lockedS||i>=n-1);
+  it('⧉ Dupliquer','Ctrl+D',()=>duplicate(id));
+  if(r.type==='math'||r.type==='text') it(r.type==='math'?'⇄ Changer en texte':'⇄ Changer en calcul','Ctrl+M',()=>{ toggleType(id); focusRow(id,'end'); },lockedS);
+  it('🔊 Lire à voix haute','F2',()=>speak(rowSpeech(r)));
+  if(state.settings.teacher) it(r.locked?'🔓 Libérer (ne plus protéger)':'🔒 Protéger comme énoncé','',()=>toggleLock(id));
+  const hr=document.createElement('hr'); m.append(hr);
+  it('🗑 Supprimer','Ctrl+Maj+⌫',()=>deleteRow(id),lockedS);
+  setCurrent(id); openMenu(m,anchor,false,()=>focusRow(id,'end'));
 }
 
 /* ============ Mode examen : les aides qui donnent des réponses sont coupées ============ */
@@ -2155,7 +2351,9 @@ function applyExam(){
   if(!b){ renderTools(); return; }
   if(on){ b.hidden=false; b.querySelector('.ex-txt').textContent='MODE EXAMEN — commencé à '+hhmm(x.start)+' · aides coupées'+(x.calc?' · calculatrice coupée':'')+(x.graph?' · graphiques coupés':''); }
   else b.hidden=true;
-  ['pageSel','newPage','openBtn'].forEach(id=>{ const el=document.getElementById(id); if(el) el.disabled=on; });
+  ['pagesBtn','newPage','openBtn'].forEach(id=>{ const el=document.getElementById(id); if(el) el.disabled=on; });
+  if(on){ const P=document.getElementById('pagesPanel'); if(P && !P.hidden) setPages(false); if(tourBox) endTour(); }
+  updEmpty();
   if(on && state.current!==x.page && state.pages.some(p=>p.id===x.page)) state.current=x.page;
   renderTools();
 }
@@ -2251,6 +2449,12 @@ function runSelfTest(){
     try{ const el=makeRowEl({id:'o'+expr,type:'op',value:{expr,res:{},ret:{},cells:{}}}); box.append(el); ok('opération posée '+expr, el.querySelectorAll('.op-grid input').length>0); }
     catch(e){ ok('opération posée '+expr,false,String(e&&e.message||e)); } });
   setTimeout(()=>box.remove(),500);
+  // ergonomie (1.2)
+  ok('messages : temps de lecture selon la longueur',toastMs('OK')===3500 && toastMs('x'.repeat(400))===12000 && toastMs('Bonjour à toi, ceci est un message de taille moyenne pour lire')>3500);
+  ok('aide trouvable avec Ctrl+K',helpIndex().some(x=>/supprimer/.test(x.hay)));
+  ok('menu Fichier : toutes les actions',['open','saveas','all','pdf','word','odt','txt','latex'].every(a=>document.querySelector('#fileMenu [data-act="'+a+'"]')));
+  ok('réglages rangés en 4 onglets',document.querySelectorAll('#setDlg .stab').length===4);
+  ok('panneau des pages présent',!!document.getElementById('pagesList'));
   ok('éditeur de formules MathLive chargé',!!MFE,'MathLive ne s’est pas chargé');
   ok('enregistrement dans le navigateur',canStore);
   return res;
@@ -2265,12 +2469,12 @@ function showSelfTest(){
 window.MathDysTest=runSelfTest;
 
 /* ============ Démarrage ============ */
-applySettings(); renderTools(); if(isExam()) applyExam(); renderPage();
+applySettings(); renderTools(); if(isExam()) applyExam(); renderPage(); updEmpty();
 refreshFileStatus();
 window.__mathdysStarted=true;
 const backupReminder=()=>{ if(isExam()) return; const n=state.pages.filter(p=>p.rows.some(r=>!isEmpty(r))).length; const last=state.lastBackup?new Date(state.lastBackup):null;
   if(n>=5 && (!last || Date.now()-last>30*864e5)) setTimeout(()=>toast('Pense à faire une sauvegarde complète de ton cahier ('+n+' pages)','Sauvegarder',saveAll),4000); };
-const start=()=>{ const R=page().rows; focusRow(R[R.length-1].id,'end'); backupReminder(); if(location.hash==='#test') setTimeout(showSelfTest,600); else if(!state.seenHelp) openDlg('helpDlg'); };
+const start=()=>{ const R=page().rows; focusRow(R[R.length-1].id,'end'); backupReminder(); if(location.hash==='#test') setTimeout(showSelfTest,600); else if(!state.seenHelp && !isExam()) setTimeout(startTour,400); };
 if(window.customElements && customElements.whenDefined && MFE){ customElements.whenDefined('math-field').then(()=>setTimeout(start,150)); } else start();
 if(document.fonts && document.fonts.ready) document.fonts.ready.then(()=>setTimeout(alignAll,50));
 })();
@@ -2287,7 +2491,7 @@ if(document.fonts && document.fonts.ready) document.fonts.ready.then(()=>setTime
   };
   if(err && err.mathdysReload){ hard(); return; }
   const d=document.createElement('div'); d.className='loaderr'; d.style.display='block'; d.setAttribute('role','alert');
-  d.innerHTML='<b>MathDys n’a pas pu démarrer correctement.</b> Tes cahiers ne sont pas effacés. <button class="btn primary" id="repairBtn">Réparer et recharger</button><br><small></small>';
+  d.innerHTML='<b>MathDys n’a pas pu démarrer correctement.</b> Tes pages ne sont pas effacées. <button class="btn primary" id="repairBtn">Réparer et recharger</button><br><small></small>';
   d.querySelector('small').textContent=(err&&err.message)?('Détail : '+err.message):'';
   document.body.prepend(d); document.getElementById('repairBtn').onclick=hard;
   if(err) console.error(err);

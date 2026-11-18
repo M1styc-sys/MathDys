@@ -1,5 +1,17 @@
 # Nouveautés de MathDys
 
+## Version 1.2.0 — plus simple à prendre en main
+- **Écran plus léger** : un seul menu **📁 Fichier** (ouvrir, enregistrer sous, sauvegarder tout le cahier, imprimer ou PDF, Word, LibreOffice, copier). **💾 Enregistrer** reste à portée de main. Les boutons qui n'avaient qu'un symbole ont maintenant un nom (↶ Annuler, ↷ Rétablir, 🎯 Concentration).
+- **Visite guidée** au premier lancement, à faire en vrai sur la page : une fraction, Entrée, Ctrl+D, F9, Ctrl+K. Elle remplace le grand tableau d'aide. À revoir depuis l'aide (F1) ou les réglages.
+- **Messages lisibles** : ils restent affichés selon leur longueur, ne disparaissent pas tant que la souris est dessus, et ont un bouton ✕ et un bouton 🔊 pour les écouter.
+- **Astuces au bon moment**, une seule fois chacune (par exemple « tape 3/4 » après plusieurs clics sur le bouton fraction, ou « Ctrl+D » quand on réécrit la ligne du dessus). Désactivables dans Réglages → Aides.
+- **📚 Pages** (ou F4) : un panneau avec toutes les pages rangées par matière, une recherche, et 📁 Ranger / 🗑 Supprimer pour chaque page.
+- **Réglages en 4 onglets** (Affichage, Aides, Clavier, Professeur et examen) avec un **aperçu en direct**.
+- **Ctrl+K trouve aussi les réponses de l'aide** : tape « supprimer », « enregistrer », « matière »…
+- **Menu de la ligne** : clic droit sur une ligne, touche Menu du clavier, ou toucher l'icône à gauche sur tablette → monter, descendre, dupliquer, changer en texte ou en calcul, lire, supprimer.
+- **Tablettes et téléphones** : les barres d'outils tiennent enfin sur une ligne et une flèche **›** montre qu'il y a d'autres outils.
+- **Mêmes mots partout** (cahier, page, ligne, bloc, sauvegarde, fiche, énoncé), avec un petit lexique dans l'aide.
+
 ## Version 1.1.1 — version stable (corrections)
 - **Mode examen** : le bandeau rouge restait affiché en permanence, même hors examen ou après en être sorti, avec un bouton « Quitter » sans effet. Corrigé.
 - **Mode examen** : impossible désormais d'en sortir en ouvrant un fichier depuis l'ordinateur ; le bouton « Vérifier » des additions et soustractions est bien coupé ; si le code du professeur est perdu, il n'est plus demandé 4 h après le début ; le cadre rouge ne disparaît plus quand on change un réglage.

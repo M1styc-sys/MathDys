@@ -12,19 +12,18 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Andika&family=Atkinson+Hyperlegible:wght@400;700&family=Lexend:wght@400;600&display=swap" rel="stylesheet">
-<meta name="mathdys-version" content="1.1.1">
+<meta name="mathdys-version" content="1.2.0">
 <!-- Éditeur de formules MathLive 0.104.2 (version figée : une mise à jour de leur côté ne peut pas casser MathDys) -->
 <script src="https://cdn.jsdelivr.net/npm/mathlive@0.104.2/dist/mathlive.min.js"></script>
-<link rel="stylesheet" href="style.css?v=1.1.1">
+<link rel="stylesheet" href="style.css?v=1.2.0">
 </head>
 <body>
 <div class="exambar" id="examBar" hidden role="status"><span class="ex-txt"></span><button class="btn" id="examQuit">Quitter le mode examen</button></div>
 <header>
   <div class="bar">
     <div class="brand">Math<span>Dys</span></div>
-    <select id="pageSel" class="btn" aria-label="Page" title="Changer de page"></select>
+    <button class="btn" id="pagesBtn" aria-expanded="false" aria-controls="pagesPanel" title="Voir et ranger mes pages">📚 Pages</button>
     <input id="pageTitle" class="pageTitle" aria-label="Titre de la page" title="Nom de la page (clique pour renommer)">
-    <button class="btn" id="newPage" title="Nouvelle page">＋ Page</button>
     <div class="grow"></div>
     <span class="status" id="status"></span>
     <select id="levelSel" class="btn" aria-label="Niveau" title="Niveau">
@@ -32,34 +31,50 @@
       <option value="college">Collège</option>
       <option value="lycee">Lycée</option>
     </select>
-    <button class="btn" id="openBtn" title="Ouvrir un cahier enregistré sur ton ordinateur (Ctrl+O)">📂 Ouvrir</button>
-    <button class="btn" id="saveBtn" title="Enregistrer ce cahier sur ton ordinateur (Ctrl+S) — Ctrl+Maj+S pour « Enregistrer sous »">💾 Enregistrer</button>
+    <button class="btn" id="saveBtn" title="Enregistrer cette page sur ton ordinateur (Ctrl+S)">💾 Enregistrer</button>
+    <div class="menuwrap">
+      <button class="btn" id="fileBtn" aria-haspopup="menu" aria-expanded="false" aria-controls="fileMenu" title="Ouvrir, enregistrer, imprimer, exporter">📁 Fichier ▾</button>
+      <div class="menu" id="fileMenu" role="menu" hidden>
+        <button role="menuitem" id="openBtn" data-act="open">📂 Ouvrir une page ou une sauvegarde… <kbd>Ctrl+O</kbd></button>
+        <button role="menuitem" data-act="saveas">💾 Enregistrer sous… <kbd>Ctrl+Maj+S</kbd></button>
+        <button role="menuitem" data-act="all">🗂 Sauvegarder tout le cahier</button>
+        <hr>
+        <button role="menuitem" id="printBtn" data-act="pdf">🖨 Imprimer ou PDF <kbd>Ctrl+P</kbd></button>
+        <button role="menuitem" data-act="word">📝 Exporter pour Word (formules en équations)</button>
+        <button role="menuitem" data-act="odt">📝 Exporter pour LibreOffice ou Word (formules en texte)</button>
+        <hr>
+        <button role="menuitem" data-act="txt">📋 Copier la page en texte lisible</button>
+        <button role="menuitem" data-act="latex">📋 Copier la page en LaTeX</button>
+      </div>
+    </div>
     <input type="file" id="fileIn" accept=".mathdys,.json,application/json" hidden>
     <input type="file" id="imgIn" accept="image/*" hidden>
-    <button class="btn" id="printBtn" title="Imprimer ou enregistrer en PDF (Ctrl+P)">🖨 Imprimer / PDF</button>
-    <select id="exportSel" class="btn" aria-label="Exporter" title="Copier ou exporter le cahier">
-      <option value="" selected hidden>Exporter…</option>
-      <option value="all">💾 Sauvegarder tout le cahier (toutes les pages)</option>
-      <option value="pdf">PDF ou impression</option>
-      <option value="word">Fichier Word (.doc), formules en équations</option>
-      <option value="odt">Fichier pour LibreOffice ou Word, formules en texte</option>
-      <option value="txt">Copier en texte lisible</option>
-      <option value="latex">Copier en LaTeX</option>
-    </select>
-    <button class="btn" id="settingsBtn" title="Réglages d'affichage">Réglages</button>
-    <button class="btn primary" id="helpBtn" title="Raccourcis clavier (F1)">? Aide</button>
+    <button class="btn" id="settingsBtn" title="Réglages">⚙ Réglages</button>
+    <button class="btn primary" id="helpBtn" title="Aide et raccourcis (F1)">? Aide</button>
   </div>
   <div class="tools" id="tools" role="toolbar" aria-label="Outils"></div>
   <div class="cats" id="cats"></div>
   <div class="tools items" id="items"></div>
 </header>
 
+<!-- Panneau des pages -->
+<aside class="pages-panel" id="pagesPanel" hidden aria-label="Mes pages">
+  <div class="pp-head"><b>📚 Mes pages</b><button class="btn" id="pagesClose" title="Fermer le panneau" aria-label="Fermer le panneau">✕</button></div>
+  <input id="pagesFind" class="srch" placeholder="Chercher une page…" aria-label="Chercher une page" autocomplete="off">
+  <div class="pp-list" id="pagesList" role="list"></div>
+  <button class="btn primary" id="newPage" title="Nouvelle page (un nouveau cours)">＋ Nouvelle page</button>
+</aside>
+
+<!-- Menu d'une ligne -->
+<div class="menu rowmenu" id="rowMenu" role="menu" hidden></div>
+
 <div class="printhead" id="printhead"></div>
 <div class="loaderr" id="loaderr">L'éditeur de formules n'a pas pu se charger (pas de connexion ?). Recharge la page une fois connecté.</div>
 
 <main id="main" aria-label="Cahier">
   <h1 class="sr" id="sr-title">Cahier MathDys</h1>
-  <div class="paper" id="paper" role="list" aria-label="Lignes du cahier"></div>
+  <div class="paper" id="paper" role="list" aria-label="Lignes de la page"></div>
+  <div class="paper-empty" id="emptyHint" hidden>Ta page est prête : écris un calcul sur la ligne (par exemple <b>3/4 + 1/4</b>), ou un texte avec <kbd>Maj</kbd>+<kbd>Entrée</kbd>. <a href="#" id="emptyTour">Visite guidée en 2 minutes</a></div>
   <div class="hint">Entrée : nouvelle ligne · Ctrl+D : dupliquer la ligne · Ctrl+Entrée : calculer · Ctrl+K : chercher un symbole · Ctrl+S : enregistrer · F1 : toute l'aide</div>
   <aside class="contact">
     <div class="contact-ic">💬</div>
@@ -80,38 +95,55 @@
 
 <!-- Réglages -->
 <div class="overlay" id="setDlg"><div class="dialog" role="dialog" aria-modal="true" aria-label="Réglages">
-  <h2>Réglages d'affichage</h2>
-  <div class="presets"><span>Réglages tout prêts :</span>
-    <button class="btn" data-preset="dyspraxie">Dyspraxie</button><button class="btn" data-preset="dyslexie">Dyslexie</button>
-    <button class="btn" data-preset="dyscalculie">Dyscalculie</button><button class="btn" data-preset="defaut">Par défaut</button></div>
-  <p class="op-msg" style="margin:.2em 0 .6em">Un point de départ : ajuste ensuite chaque réglage, si possible avec ton ou ta ergothérapeute.</p>
-  <div class="field"><label for="sFs">Taille du texte</label><input type="range" id="sFs" min="16" max="34" step="1"></div>
-  <div class="field"><label for="sLh">Espace entre les lignes</label><input type="range" id="sLh" min="1.2" max="2.4" step="0.1"></div>
-  <div class="field"><label for="sFont">Police</label>
-    <select id="sFont" class="btn">
-      <option value="'Lexend', Arial, sans-serif">Lexend</option>
-      <option value="'Atkinson Hyperlegible', Arial, sans-serif">Atkinson Hyperlegible</option>
-      <option value="'Andika', Arial, sans-serif">Andika</option>
-      <option value="Verdana, sans-serif">Verdana</option>
-      <option value="Arial, sans-serif">Arial</option>
-    </select></div>
-  <div class="field"><label for="sTheme">Couleurs</label>
-    <select id="sTheme" class="btn"><option value="clair">Clair</option><option value="creme">Crème (moins éblouissant)</option><option value="sombre">Sombre</option></select></div>
-  <div class="field"><label for="sName">Ton nom (écrit en haut de la copie imprimée)</label><input type="text" id="sName" class="btn" style="width:12em;text-align:left" placeholder="Prénom Nom"></div>
-  <div class="field"><label for="sAlign">Aligner les signes = d'une ligne à l'autre</label><input type="checkbox" id="sAlign"></div>
-  <div class="field"><label for="sLabels">Opérations posées : afficher u, d, c au-dessus des colonnes</label><input type="checkbox" id="sLabels"></div>
-  <div class="field"><label for="sCheck">Opérations posées : bouton « Vérifier »</label><input type="checkbox" id="sCheck"></div>
-  <div class="field"><label for="sFocus">Mode concentration : estomper les autres lignes (F8)</label><input type="checkbox" id="sFocus"></div>
-  <div class="field"><label for="sParens">Colorer les parenthèses par paire</label><input type="checkbox" id="sParens"></div>
-  <div class="field"><label for="sDigits">Colorer les chiffres (bleu) et les lettres (violet) dans les calculs</label><input type="checkbox" id="sDigits"></div>
-  <div class="field"><label>Mode examen (contrôle, brevet, bac)</label><button class="btn" id="examOpen">🎓 Mode examen…</button></div>
-  <div class="field"><label for="sTeacher">Mode professeur : marquer des lignes comme « énoncé » protégé (🔒)</label><input type="checkbox" id="sTeacher"></div>
-  <div class="field"><label for="sSimple">Mode simple : n’afficher que les boutons essentiels</label><input type="checkbox" id="sSimple"></div>
-  <div class="field"><label for="sVkb">Clavier de maths à l’écran (tablettes)</label>
-    <select id="sVkb" class="btn"><option value="auto">Automatique (tablettes)</option><option value="on">Toujours proposer</option><option value="off">Jamais</option></select></div>
-  <div class="field" style="flex-wrap:wrap"><label for="sAbbr">Mes abréviations, une par ligne (ex. <code>ssi = si et seulement si</code>, <code>dv = dérivée</code>). Elles marchent dans le texte et dans les calculs.</label>
-    <textarea id="sAbbr" rows="3" style="width:100%;font:inherit;font-size:.9em;border:1px solid var(--line);border-radius:8px;padding:.4em;background:var(--soft);color:var(--ink)" placeholder="ssi = si et seulement si"></textarea></div>
-  <div class="field"><label for="sRate">Vitesse de la lecture à voix haute</label><input type="range" id="sRate" min="0.5" max="1.5" step="0.05"></div>
+  <h2>Réglages</h2>
+  <div class="stabs" role="tablist">
+    <button role="tab" class="stab-btn on" data-tab="aff" aria-selected="true">Affichage</button>
+    <button role="tab" class="stab-btn" data-tab="aides" aria-selected="false">Aides</button>
+    <button role="tab" class="stab-btn" data-tab="clavier" aria-selected="false">Clavier</button>
+    <button role="tab" class="stab-btn" data-tab="prof" aria-selected="false">Professeur et examen</button>
+  </div>
+  <div class="stab" data-tab="aff" role="tabpanel">
+    <div class="presets"><span>Réglages tout prêts :</span>
+      <button class="btn" data-preset="dyspraxie">Dyspraxie</button><button class="btn" data-preset="dyslexie">Dyslexie</button>
+      <button class="btn" data-preset="dyscalculie">Dyscalculie</button><button class="btn" data-preset="defaut">Par défaut</button></div>
+    <p class="op-msg" style="margin:.2em 0 .4em">Un point de départ : ajuste ensuite chaque réglage, si possible avec ton ou ta ergothérapeute.</p>
+    <div class="preview" id="preview" aria-label="Aperçu"><div class="pv-lab">Aperçu</div><div class="pv-text">Le triangle (ABC) est rectangle en A.</div><div class="pv-math" id="pvMath"></div></div>
+    <div class="field"><label for="sFs">Taille du texte</label><input type="range" id="sFs" min="16" max="34" step="1"></div>
+    <div class="field"><label for="sLh">Espace entre les lignes</label><input type="range" id="sLh" min="1.2" max="2.4" step="0.1"></div>
+    <div class="field"><label for="sFont">Police</label>
+      <select id="sFont" class="btn">
+        <option value="'Lexend', Arial, sans-serif">Lexend</option>
+        <option value="'Atkinson Hyperlegible', Arial, sans-serif">Atkinson Hyperlegible</option>
+        <option value="'Andika', Arial, sans-serif">Andika</option>
+        <option value="Verdana, sans-serif">Verdana</option>
+        <option value="Arial, sans-serif">Arial</option>
+      </select></div>
+    <div class="field"><label for="sTheme">Couleurs</label>
+      <select id="sTheme" class="btn"><option value="clair">Clair</option><option value="creme">Crème (moins éblouissant)</option><option value="sombre">Sombre</option></select></div>
+    <div class="field"><label for="sParens">Colorer les parenthèses par paire</label><input type="checkbox" id="sParens"></div>
+    <div class="field"><label for="sDigits">Colorer les chiffres (bleu) et les lettres (violet) dans les calculs</label><input type="checkbox" id="sDigits"></div>
+    <div class="field"><label for="sFocus">Mode concentration : estomper les autres lignes (F8)</label><input type="checkbox" id="sFocus"></div>
+    <div class="field"><label for="sSimple">Mode simple : n’afficher que les boutons essentiels</label><input type="checkbox" id="sSimple"></div>
+  </div>
+  <div class="stab" data-tab="aides" role="tabpanel" hidden>
+    <div class="field"><label for="sAlign">Aligner les signes = d’une ligne à l’autre</label><input type="checkbox" id="sAlign"></div>
+    <div class="field"><label for="sLabels">Opérations posées : afficher u, d, c au-dessus des colonnes</label><input type="checkbox" id="sLabels"></div>
+    <div class="field"><label for="sCheck">Opérations posées : bouton « Vérifier »</label><input type="checkbox" id="sCheck"></div>
+    <div class="field"><label for="sTips">Me montrer des astuces pendant que je travaille</label><input type="checkbox" id="sTips"></div>
+    <div class="field"><label for="sRate">Vitesse de la lecture à voix haute</label><input type="range" id="sRate" min="0.5" max="1.5" step="0.05"></div>
+    <div class="field"><label for="sName">Ton nom (écrit en haut de la copie imprimée)</label><input type="text" id="sName" class="btn" style="width:12em;text-align:left" placeholder="Prénom Nom"></div>
+    <div class="field"><label>Revoir la visite guidée</label><button class="btn" id="tourAgain">▶ Visite guidée</button></div>
+  </div>
+  <div class="stab" data-tab="clavier" role="tabpanel" hidden>
+    <div class="field" style="flex-wrap:wrap"><label for="sAbbr">Mes abréviations, une par ligne (ex. <code>ssi = si et seulement si</code>, <code>dv = dérivée</code>). Elles marchent dans le texte et dans les calculs.</label>
+      <textarea id="sAbbr" rows="4" style="width:100%;font:inherit;font-size:.9em;border:1px solid var(--line);border-radius:8px;padding:.4em;background:var(--soft);color:var(--ink)" placeholder="ssi = si et seulement si"></textarea></div>
+    <div class="field"><label for="sVkb">Clavier de maths à l’écran (tablettes)</label>
+      <select id="sVkb" class="btn"><option value="auto">Automatique (tablettes)</option><option value="on">Toujours proposer</option><option value="off">Jamais</option></select></div>
+  </div>
+  <div class="stab" data-tab="prof" role="tabpanel" hidden>
+    <div class="field"><label>Mode examen (contrôle, brevet, bac)</label><button class="btn" id="examOpen">🎓 Mode examen…</button></div>
+    <div class="field"><label for="sTeacher">Mode professeur : marquer des lignes comme « énoncé » protégé (🔒)</label><input type="checkbox" id="sTeacher"></div>
+  </div>
   <div class="foot"><button class="btn primary" data-close>Fermer</button></div>
 </div></div>
 
@@ -151,8 +183,8 @@
 </div></div>
 
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
-<div class="drop" id="drop">Lâche le fichier pour ouvrir le cahier</div>
+<div class="drop" id="drop">Lâche le fichier ici pour l’ouvrir</div>
 
-<script src="app.js?v=1.1.1"></script>
+<script src="app.js?v=1.2.0"></script>
 </body>
 </html>

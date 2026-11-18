@@ -5,7 +5,7 @@
 MathDys est un cahier de mathématiques en ligne pour prendre des notes **vite, au clavier, sans souris**.
 Il est pensé pour les élèves dyspraxiques, dyslexiques et dyscalculiques, de la primaire au lycée.
 
- **Utiliser MathDys : https://mathdys.github.io/**
+👉 **Utiliser MathDys : https://mathdys.github.io/**
 
 ## Ce qu'il sait faire
 
@@ -40,6 +40,8 @@ Il est pensé pour les élèves dyspraxiques, dyslexiques et dyscalculiques, de 
 - **Mode examen** : les aides qui donnent des réponses sont coupées, l'heure de début est imprimée sur la copie
 
 **Confort**
+- **Visite guidée** au premier lancement, **menu Fichier** unique, **messages lisibles** (durée selon la longueur, bouton 🔊), **astuces au bon moment**
+- **Panneau 📚 Pages** rangées par matière (F4), **menu de la ligne** (clic droit ou toucher l'icône), **réglages en onglets** avec aperçu
 - **Pages rangées par matière**, **Mode simple**, **Annuler / Rétablir** pour tout le cahier, **déplacer les blocs**, **clavier de maths à l'écran** pour les tablettes
 - Conçu pour être utilisable **au clavier seul** et avec un **lecteur d'écran**
 
@@ -58,7 +60,7 @@ Dans Chrome ou Edge, vous pouvez aussi **l'installer comme une application** (ic
 
 ## Une idée ? Un bug ?
 
-Dans MathDys : bouton **🐞 Signaler un bug** en bas du cahier. Ou écrivez à **git.public@protonmail.com** ou ouvrez une *Issue* sur ce dépôt.
+Dans MathDys : bouton **🐞 Signaler un bug** en bas de la page. Ou écrivez à **git.public@protonmail.com** ou ouvrez une *Issue* sur ce dépôt.
 Pour un bug, indiquez ce que vous faisiez, ce qui s'est passé et votre navigateur.
 
 ## Vérifier que tout marche

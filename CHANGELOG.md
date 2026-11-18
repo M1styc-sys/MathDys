@@ -1,5 +1,10 @@
 # Nouveautés de MathDys
 
+## Version 1.1.0
+- **Mode examen** (Réglages → 🎓, ou Ctrl+K → « examen ») : coupe les aides qui donnent des réponses (vérification des étapes, aide-mémoire, abréviations, « Vérifier » des opérations, calculs automatiques des arbres et des tableaux), au choix la calculatrice et les graphiques, et l'accès aux autres pages et fichiers. Bandeau visible, heure de début imprimée sur la copie, code facultatif du professeur pour en sortir.
+- **Sauvegarder tout le cahier** en un seul fichier (Exporter… → 💾), et le restaurer avec 📂 Ouvrir, sans rien effacer. Petit rappel quand le cahier grandit.
+- **Téléphones et tablettes** : barres d'outils compactes qui défilent sur le côté ; le cahier garde la place.
+
 ## Version 1.0.0 — première version officielle
 - **Vérifier ses étapes** (F9) : signale la ligne où une erreur s'est glissée dans une équation, une inéquation ou un calcul, sans donner la réponse.
 - **Aide-mémoire** : 27 formules du programme du collège et du lycée, à retrouver avec Ctrl+K.

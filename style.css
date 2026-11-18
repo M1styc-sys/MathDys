@@ -34,6 +34,32 @@ select.btn{padding-right:.4em}
 #pageSel{max-width:11em}
 @media (max-width:1100px){ .tool kbd{display:none} .bar{gap:.35rem;padding:.4rem .6rem} .tools{padding:.3rem .6rem .45rem} }
 @media (max-width:700px){ .pageTitle{display:none} .status{display:none} }
+/* tablettes et téléphones : chaque barre tient sur une ligne et défile sur le côté, pour laisser la place au cahier */
+@media (max-width:900px){
+  .bar,.tools,.cats,.tools.items{flex-wrap:nowrap;overflow-x:auto;overflow-y:hidden;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+  .bar::-webkit-scrollbar,.tools::-webkit-scrollbar,.cats::-webkit-scrollbar{display:none}
+  .bar>*,.tool,.cat{flex:none}
+  .tool.simple-toggle{margin-left:0}
+  .bar,.tools,.cats{mask-image:linear-gradient(90deg,#000 92%,transparent);-webkit-mask-image:linear-gradient(90deg,#000 92%,transparent)}
+}
+@media (max-width:700px){
+  .bar{gap:.3rem;padding:.3rem .5rem}
+  .bar .btn,.bar select{font-size:.62em;padding:.3em .55em}
+  .brand{font-size:.8em}
+  .tools{padding:.25rem .5rem;gap:.3rem}
+  .tool{font-size:.68em;padding:.25em .55em;min-height:2.2em}
+  .cats{padding:.2rem .5rem 0}
+  .cat{font-size:.65em}
+  main{margin:.5rem auto 40vh;padding:0 .25rem}
+  .paper{border-radius:10px}
+  .row{padding:.1rem .3rem .1rem .1rem;gap:.15rem}
+  .gutter{width:1.5em;font-size:.6em}
+  .rmove{display:none}
+  .rdel{opacity:.5}
+  .contact{margin:1rem .2rem 0}
+  .exambar{font-size:.65em;flex-wrap:wrap;gap:.4rem}
+  .dialog{padding:1rem}
+}
 /* ---------- palette d'outils ---------- */
 .tools{display:flex;flex-wrap:wrap;gap:.35rem;padding:.35rem .9rem .55rem;border-top:1px solid var(--line)}
 .tool{border:1px solid var(--line);background:var(--paper);border-radius:9px;padding:.25em .55em;cursor:pointer;display:inline-flex;align-items:baseline;gap:.4em;line-height:1.2}
@@ -213,6 +239,7 @@ body.focusmode .row:not(.current):hover{opacity:.6}
   .printhead{display:block;margin:0 0 6mm}
   .printhead .ph-top{display:flex;justify-content:space-between;font-size:10pt;color:#333;border-bottom:1px solid #999;padding-bottom:2mm}
   .printhead h1{font-size:16pt;margin:4mm 0 0}
+  .printhead .ph-exam{font-size:9pt;color:#8a1c14;margin-top:2mm;border:1px solid #8a1c14;padding:1mm 2mm;border-radius:2mm}
   main{margin:0;max-width:none;padding:0}
   .paper{box-shadow:none;padding:0;border-radius:0}
   .row{break-inside:avoid;border:0!important;background:none!important;padding-left:0;opacity:1!important}
@@ -224,5 +251,10 @@ body.focusmode .row:not(.current):hover{opacity:.6}
   .gcanvas{border:1px solid #999;height:auto;max-height:110mm}
   .txt:empty:before{content:none}
 }
+.exambar{position:sticky;top:0;z-index:30;background:#8a1c14;color:#fff;display:flex;align-items:center;justify-content:center;gap:1rem;padding:.35em .8em;font-size:.8em;font-weight:700;letter-spacing:.02em}
+.exambar .btn{background:#fff;color:#8a1c14;border-color:#fff;font-size:.85em}
+body.exam header{top:2.1em}
+body.exam .paper{outline:3px solid #8a1c14;outline-offset:4px}
+@media print{ .exambar{display:none!important} }
 .drop{position:fixed;inset:0;background:rgba(47,111,222,.15);border:4px dashed var(--accent);display:none;align-items:center;justify-content:center;font-size:1.3em;font-weight:600;color:var(--accent);z-index:70;pointer-events:none}
 .drop.on{display:flex}

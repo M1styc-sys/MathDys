@@ -1,6 +1,6 @@
 /* MathDys — service worker : garde une copie du site pour qu'il marche sans Internet.
    Aucune donnée des cahiers ne passe par ici : seuls les fichiers du site sont mis en cache. */
-const VERSION = 'mathdys-1.0.0';
+const VERSION = 'mathdys-1.1.0';
 const CORE = ['./', './index.html', './style.css', './app.js', './manifest.webmanifest',
               './icon.svg', './icon-192.png', './icon-512.png', './apple-touch-icon.png'];
 const CDN = ['cdn.jsdelivr.net', 'fonts.googleapis.com', 'fonts.gstatic.com'];

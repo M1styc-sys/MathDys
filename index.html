@@ -20,6 +20,7 @@
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
+<div class="exambar" id="examBar" hidden role="status"><span class="ex-txt"></span><button class="btn" id="examQuit">Quitter le mode examen</button></div>
 <header>
   <div class="bar">
     <div class="brand">Math<span>Dys</span></div>
@@ -40,6 +41,7 @@
     <button class="btn" id="printBtn" title="Imprimer ou enregistrer en PDF (Ctrl+P)">🖨 Imprimer / PDF</button>
     <select id="exportSel" class="btn" aria-label="Exporter" title="Copier ou exporter le cahier">
       <option value="" selected hidden>Exporter…</option>
+      <option value="all">💾 Sauvegarder tout le cahier (toutes les pages)</option>
       <option value="pdf">PDF ou impression</option>
       <option value="word">Fichier Word (.doc), formules en équations</option>
       <option value="odt">Fichier pour LibreOffice ou Word, formules en texte</option>
@@ -104,6 +106,7 @@
   <div class="field"><label for="sFocus">Mode concentration : estomper les autres lignes (F8)</label><input type="checkbox" id="sFocus"></div>
   <div class="field"><label for="sParens">Colorer les parenthèses par paire</label><input type="checkbox" id="sParens"></div>
   <div class="field"><label for="sDigits">Colorer les chiffres (bleu) et les lettres (violet) dans les calculs</label><input type="checkbox" id="sDigits"></div>
+  <div class="field"><label>Mode examen (contrôle, brevet, bac)</label><button class="btn" id="examOpen">🎓 Mode examen…</button></div>
   <div class="field"><label for="sTeacher">Mode professeur : marquer des lignes comme « énoncé » protégé (🔒)</label><input type="checkbox" id="sTeacher"></div>
   <div class="field"><label for="sSimple">Mode simple : n’afficher que les boutons essentiels</label><input type="checkbox" id="sSimple"></div>
   <div class="field"><label for="sVkb">Clavier de maths à l’écran (tablettes)</label>
@@ -119,6 +122,16 @@
   <input id="srchIn" class="srch" aria-label="Nom du symbole" placeholder="Cherche un symbole, une formule ou une page : infini, Pythagore, discriminant…" autocomplete="off">
   <div class="slist" id="srchList"></div>
   <div class="foot"><span style="flex:1;font-size:.7em;color:var(--muted)">↑ ↓ pour choisir · Entrée pour insérer · Échap pour fermer</span></div>
+</div></div>
+
+<!-- Mode examen -->
+<div class="overlay" id="examDlg"><div class="dialog" style="max-width:600px" role="dialog" aria-modal="true" aria-label="Mode examen">
+  <h2>Mode examen</h2>
+  <p class="op-msg" style="font-size:.8em">Pour un contrôle, le brevet ou le bac : les aides qui donnent des réponses sont coupées (vérification des étapes, aide-mémoire, abréviations, « Vérifier » des opérations, calculs automatiques des arbres et des tableaux), ainsi que l’accès aux autres pages et aux fichiers. Un bandeau reste affiché, et l’heure de début est imprimée sur la copie.</p>
+  <div class="field"><label for="exCalc">Couper aussi la calculatrice (Ctrl+Entrée)</label><input type="checkbox" id="exCalc" checked></div>
+  <div class="field"><label for="exGraph">Couper aussi les graphiques de fonctions</label><input type="checkbox" id="exGraph"></div>
+  <div class="field"><label for="exCode">Code pour en sortir (facultatif, gardé par le professeur)</label><input type="password" id="exCode" class="btn" style="width:9em;text-align:left" autocomplete="off"></div>
+  <div class="foot" style="flex-wrap:wrap"><button class="btn" data-close>Annuler</button><button class="btn" id="exFile">Commencer avec la fiche du professeur…</button><button class="btn primary" id="exStart">Commencer sur une page vierge</button></div>
 </div></div>
 
 <!-- Signaler un bug -->

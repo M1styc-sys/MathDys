@@ -18,6 +18,7 @@
    - Fenêtres, réglages, pages
    - Export : texte lisible, LaTeX, Word / LibreOffice
    - Fichiers sur l'ordinateur (aucun compte, aucun serveur)
+   - Mode examen : les aides qui donnent des réponses sont coupées
    - Signaler un bug
    - Hors ligne : installation comme une application
    - Auto-test (ouvrir le site avec #test à la fin de l'adresse)
@@ -132,6 +133,7 @@ const CATALOG=[
   ['+−','Opération posée','@op',null,0,'addition soustraction multiplication division poser'],
   ['🖼','Image de l\u2019énoncé','@img',null,0,'photo capture énoncé'],
   ['🐞','Signaler un bug ou proposer une idée','@bug',null,0,'problème erreur contact aide'],
+  ['🎓','Mode examen','@exam',null,0,'contrôle brevet bac évaluation devoir'],
   ['P(A)','Probabilité de A','P\\left(#?\\right)',null,1,''],
   ['Ā','Contraire (barre)','\\overline{#?}','barre',1,'complémentaire événement'],
   ['∩','Intersection (et)','\\cap','inter',1,'et'],
@@ -194,7 +196,7 @@ const NATIVE=new Set(['/','^','_','(','[','%','*']);
 const SHORTCUTS={'fois':'\\times','*':'\\times'};
 ALLSYM.forEach(s=>{ if(s.key && !NATIVE.has(s.key)) SHORTCUTS[s.key]=s.tpl.replace(/#@/g,'#?'); });
 function userAbbr(){ // « abréviation = texte », une par ligne (Réglages)
-  const m={}; (state&&state.settings&&state.settings.abbr||'').split('\n').forEach(l=>{ const i=l.indexOf('='); if(i<1) return;
+  const m={}; if(state&&state.settings&&state.settings.exam&&state.settings.exam.on) return m; (state&&state.settings&&state.settings.abbr||'').split('\n').forEach(l=>{ const i=l.indexOf('='); if(i<1) return;
     const k=l.slice(0,i).trim(), v=l.slice(i+1).trim(); if(/^[a-zA-Z]{2,12}$/.test(k) && v) m[k]=v; }); return m; }
 function shortcutsFor(defaults){
   // retire les raccourcis par défaut qui empêcheraient les nôtres (ex. « in » avant « inf »)
@@ -204,7 +206,7 @@ function shortcutsFor(defaults){
   Object.keys(out).forEach(d=>{ if(mine.some(m=>m!==d && m.startsWith(d))) delete out[d]; });
   return Object.assign(out,SHORTCUTS);
 }
-const symsFor=level=>ALLSYM.filter(s=>s.lvl<=LV[level]);
+const symsFor=level=>ALLSYM.filter(s=>s.lvl<=LV[level] && !(isExam() && s.cat==='Formules'));
 
 /* ============ État + sauvegarde ============ */
 const KEY='mathdys.v1';
@@ -504,7 +506,7 @@ function gKey(e,row,i){
   if(e.key.length===1) e.preventDefault();
 }
 function opButtons(row,grid,side,msg,check){
-  if(state.settings.check){ const b=document.createElement('button'); b.className='btn'; b.textContent='Vérifier'; b.addEventListener('click',check); side.append(b); }
+  if(state.settings.check && !isExam()){ const b=document.createElement('button'); b.className='btn'; b.textContent='Vérifier'; b.addEventListener('click',check); side.append(b); }
   const clr=document.createElement('button'); clr.className='btn'; clr.textContent='Tout effacer';
   clr.addEventListener('click',()=>{ row.value.res={}; row.value.ret={}; row.value.cells={}; drawOp(row,grid,side,msg); scheduleSave(); });
   side.append(clr);
@@ -654,6 +656,7 @@ const GNAMES=['f','g','h','k','p','q'];
 const GCOL=['#2f6fde','#d9433b','#1f9d55','#c97a00','#8a4fd1','#0e9aa7'];
 function buildGraph(row,body){
   if(!row.value||!row.value.fns) row.value={fns:[''],view:null};
+  if(examCut('graph')){ const d=document.createElement('div'); d.className='op-msg'; d.textContent='Graphique masqué : les graphiques sont coupés en mode examen.'; body.append(d); return; }
   const V=row.value;
   if(!V.view) V.view={xmin:-10,xmax:10,ymin:-7,ymax:7};
   const box=document.createElement('div'); box.className='graph';
@@ -811,7 +814,8 @@ function buildTree(row,body){
     const fs=state.settings.fs; const counts=V.levels.map(l=>l.length); const nL=counts.length;
     const leaves=counts.reduce((a,b)=>a*b,1);
     const rowH=Math.round(fs*2.7), colW=Math.round(fs*9), nodeW=Math.round(fs*2.2);
-    const W=24+nL*colW+nodeW+(V.prod!==false?fs*16:20), H=leaves*rowH+8;
+    const showProd=V.prod!==false && !isExam();
+    const W=24+nL*colW+nodeW+(showProd?fs*16:20), H=leaves*rowH+8;
     stage.style.width=W+'px'; stage.style.height=H+'px';
     const NS='http://www.w3.org/2000/svg'; const svg=document.createElementNS(NS,'svg'); svg.setAttribute('width',W); svg.setAttribute('height',H); stage.append(svg);
     const ink=getComputedStyle(document.body).getPropertyValue('--ink').trim()||'#222';
@@ -832,7 +836,7 @@ function buildTree(row,body){
         inp.addEventListener('input',()=>{ if(inp.value) V.p[path]=inp.value; else delete V.p[path]; changed(); });
         stage.append(inp); probInputs.push(inp);
         if(L<nL-1) place(L+1,path,x+nodeW,y,s);
-        else if(V.prod!==false){ const pr=document.createElement('span'); pr.className='tprod'; pr.style.left=(x+nodeW+8)+'px'; pr.style.top=y+'px'; pr.dataset.path=path; stage.append(pr); prods.push(pr); }
+        else if(showProd){ const pr=document.createElement('span'); pr.className='tprod'; pr.style.left=(x+nodeW+8)+'px'; pr.style.top=y+'px'; pr.dataset.path=path; stage.append(pr); prods.push(pr); }
       }
     }
     place(0,'',12,H/2,0);
@@ -854,7 +858,7 @@ function buildTree(row,body){
       const vals=ins.map(i=>parseP(i.value));
       if(vals.some(v=>v!==null&&(isNaN(v)||v<0||v>1))){ ins.forEach((i,k)=>{ const v=vals[k]; if(v!==null&&(isNaN(v)||v<0||v>1)) i.classList.add('bad'); }); problems.push('Une probabilité doit être un nombre entre 0 et 1 (ex : 0,3 ou 3/10 ou 30 %).'); return; }
       const empty=ins.filter((i,k)=>vals[k]===null); const sum=vals.reduce((a,v)=>a+(v||0),0);
-      if(empty.length===1 && sum<=1+1e-9){ const r=Math.round((1-sum)*1e9)/1e9; empty[0].placeholder=fmtP(r); empty[0].dataset.auto=r; }
+      if(empty.length===1 && sum<=1+1e-9 && !isExam()){ const r=Math.round((1-sum)*1e9)/1e9; empty[0].placeholder=fmtP(r); empty[0].dataset.auto=r; }
       if(!empty.length && Math.abs(sum-1)>1e-9){ ins.forEach(i=>i.classList.add('bad'));
         const where= par==='root' ? 'au départ' : 'après '+par.split('-').map((x,L)=>evName(L,+x)).join(' puis ');
         problems.push('Les branches '+where+' font '+fmtP(sum)+' au total au lieu de 1.'); }
@@ -974,7 +978,7 @@ function buildTab(row,body){
       inp.value = (L.kind==='var'&&key[0]==='i') ? (TARROW[v]||'') : (TSIGN[v]||'');
       if(L.kind==='var'&&key[0]==='i') inp.classList.add('tarrowkey');
       cell.classList.toggle('bar2',v==='|'); });
-    const cache={}; prods.forEach(({li,key,cell})=>{ const pv=cache[li]||(cache[li]=prodLine(li)); const v=pv[key]||''; cell.textContent=TSIGN[v]||''; cell.classList.toggle('bar2',v==='|'); });
+    const cache={}; prods.forEach(({li,key,cell})=>{ const pv=isExam()?{}:(cache[li]||(cache[li]=prodLine(li))); const v=pv[key]||''; cell.textContent=TSIGN[v]||''; cell.classList.toggle('bar2',v==='|'); });
     V.lines.forEach(L=>{ if(L.kind==='var') placeVar(L,true); });
     requestAnimationFrame(arrows);
   }
@@ -1051,6 +1055,7 @@ function readImage(file){
   });
 }
 async function addImage(file,afterId){
+  if(isExam()) return examRefused('L\u2019ajout d\u2019image');
   if(!file || !/^image\//.test(file.type)){ toast('Ce fichier n\u2019est pas une image'); return; }
   try{
     const src=await readImage(file);
@@ -1114,6 +1119,7 @@ function setCurrent(id){
   currentId=id; const el=els.get(id); if(el) el.classList.add('current');
 }
 function addRowAfter(id,type,value){
+  if((type==='graph'&&examCut('graph'))||(type==='img'&&isExam())){ examRefused(type==='img'?'L\u2019ajout d\u2019image':'Le graphique'); return null; }
   beforeStructural();
   const R=page().rows; const i=id?idx(id):R.length-1;
   const row={id:uid(),type,value: value!==undefined?value:(type==='op'?{expr:'',res:{},ret:{}}:type==='graph'?{fns:[''],view:null}:type==='tree'?{levels:[['A',''],['B','']],p:{},prod:true}:type==='tab'?newTab('var'):type==='img'?{src:'',w:100}:'')};
@@ -1269,6 +1275,7 @@ function formatResult(v,src){
   return dec.length<=6 ? {rel:'=',tex:fr(r)} : {rel:'\\approx',tex:fr(+r.toFixed(4))};
 }
 function compute(id){
+  if(examCut('calc')) return examRefused('La calculatrice');
   const el=els.get(id); const mf=el&&el.querySelector('math-field'); if(!mf) return;
   const msg=el.querySelector('.calcmsg');
   let latex=mf.value.replace(/\s*=\s*(\\placeholder\{\})?\s*\??\s*$/,'');
@@ -1363,6 +1370,7 @@ function equivalent(a,b,vars){ // b découle-t-elle de a (opérations sur les de
   return true;
 }
 function checkSteps(){
+  if(isExam()) return examRefused('La vérification des étapes');
   const R=page().rows; let ok=0, bad=0, unk=0, prev=null;
   const mark=(r,cls,txt)=>{ const el=els.get(r.id); const m=el&&el.querySelector('.calcmsg'); if(m){ m.className='calcmsg '+cls; m.textContent=txt; } };
   R.forEach(r=>{
@@ -1589,15 +1597,15 @@ function renderTools(){
   act('＋ Texte','Maj+Entrée',()=>addRowAfter(currentId,'text'),'Nouvelle ligne de texte (Maj+Entrée)');
   if(!simple){
     if(L!=='lycee') act('＋ Opération posée','Ctrl+Maj+Entrée',()=>addRowAfter(currentId,'op'));
-    if(L!=='primaire') act('＋ Graphique','Ctrl+G',()=>addRowAfter(currentId,'graph'),'Tracer des fonctions');
+    if(L!=='primaire' && !examCut('graph')) act('＋ Graphique','Ctrl+G',()=>addRowAfter(currentId,'graph'),'Tracer des fonctions');
     if(L==='lycee') act('＋ Tableau de variations','',()=>addRowAfter(currentId,'tab'),'Tableau de signes et de variations');
     if(L!=='primaire') act('＋ Arbre de probas','Ctrl+B',()=>addRowAfter(currentId,'tree'),'Arbre de probabilités');
-    act('＋ Image','Ctrl+V',()=>{ const r=addRowAfter(currentId,'img'); pickImageFor(r.id); },'Ajouter l\u2019énoncé : photo ou capture d\u2019écran');
+    if(!isExam()) act('＋ Image','Ctrl+V',()=>{ const r=addRowAfter(currentId,'img'); if(r) pickImageFor(r.id); },'Ajouter l\u2019énoncé : photo ou capture d\u2019écran');
     sep();
   }
   act('Dupliquer','Ctrl+D',()=>{ if(currentId) duplicate(currentId); },'Recopier la ligne en dessous (Ctrl+D)');
-  if(!simple) act('Calculer','Ctrl+Entrée',()=>{ const r=currentId&&rowById(currentId); if(r&&r.type==='math') compute(currentId); else toast('Place-toi sur une ligne de calcul'); });
-  act('✓ Vérifier','F9',checkSteps,'Vérifier mes étapes de calcul : signale la ligne où une erreur s\u2019est glissée (F9)');
+  if(!simple && !examCut('calc')) act('Calculer','Ctrl+Entrée',()=>{ const r=currentId&&rowById(currentId); if(r&&r.type==='math') compute(currentId); else toast('Place-toi sur une ligne de calcul'); });
+  if(!isExam()) act('✓ Vérifier','F9',checkSteps,'Vérifier mes étapes de calcul : signale la ligne où une erreur s\u2019est glissée (F9)');
   act('🔊 Lire','F2',speakCurrent,'Lire la ligne à voix haute (F2 ; Maj+F2 : toute la page). Appuie encore pour arrêter.');
   const fb=act('🎯','F8',toggleFocus,'Mode concentration : estomper les autres lignes (F8)','focusBtn'); if(state.settings.focus) fb.classList.add('primary');
   act('🔍 Symbole','Ctrl+K',openSearch,'Chercher un symbole ou un outil par son nom (Ctrl+K)');
@@ -1640,7 +1648,8 @@ function targetMF(){
 function insertTpl(tpl){
   if(tpl==='@tabsign'){ addRowAfter(currentId,'tab',newTab('sign')); return; }
   if(tpl==='@bug'){ openBug(); return; }
-  if(tpl==='@img'){ const r=addRowAfter(currentId,'img'); pickImageFor(r.id); return; }
+  if(tpl==='@exam'){ openExamDlg(); return; }
+  if(tpl==='@img'){ const r=addRowAfter(currentId,'img'); if(r) pickImageFor(r.id); return; }
   if(tpl[0]==='@'){ addRowAfter(currentId,tpl.slice(1)); return; }
   const mf=targetMF(); if(!mf) return;
   mfFocus(mf);
@@ -1659,11 +1668,11 @@ function openSearch(){
 function doSearch(){
   const q=deacc(document.getElementById('srchIn').value.trim());
   const L=LV[state.settings.level];
-  srchRes=ALLSYM.map(s=>{ const hay=deacc(s.name+' '+s.kw+' '+s.cat+' '+(s.key||''));
+  srchRes=ALLSYM.filter(s=>!(isExam() && (s.cat==='Formules'||s.tpl==='@img'||(s.tpl==='@graph'&&examCut('graph'))))).map(s=>{ const hay=deacc(s.name+' '+s.kw+' '+s.cat+' '+(s.key||''));
       let sc= !q?1 : deacc(s.name).startsWith(q)?3 : hay.split(/\s+/).some(w=>w.startsWith(q))?2 : hay.includes(q)?1:0;
       if(sc && s.lvl<=L) sc+=0.5; return {s,sc}; })
     .filter(x=>x.sc>0).sort((a,b)=>b.sc-a.sc).slice(0,40).map(x=>x.s);
-  if(q) state.pages.forEach(p=>{ if(p.id!==state.current && deacc((p.title||'')+' '+(p.subject||'')).includes(q)) srchRes.unshift({page:p.id,sym:'📄',name:p.title||'Sans titre',cat:p.subject||'Page',kw:''}); });
+  if(q && !isExam()) state.pages.forEach(p=>{ if(p.id!==state.current && deacc((p.title||'')+' '+(p.subject||'')).includes(q)) srchRes.unshift({page:p.id,sym:'📄',name:p.title||'Sans titre',cat:p.subject||'Page',kw:''}); });
   srchSel=0; paintSearch();
 }
 function paintSearch(){
@@ -1769,6 +1778,9 @@ function renderHelp(){
     ['<kbd>Ctrl</kbd>+<kbd>P</kbd>','imprimer ou enregistrer en PDF une copie propre (nom, date, titre)'],
     ['<kbd>Ctrl</kbd>+<kbd>V</kbd> d\u2019une capture','mettre l\u2019énoncé en image dans le cahier (ou glisse une photo sur la page)'],
   ]);
+  h+='<h3>Mode examen</h3>'+rows([
+    ['Réglages → 🎓 Mode examen (ou Ctrl+K → « examen »)','pour un contrôle : coupe les aides qui donnent des réponses et l\u2019accès aux autres pages. Un bandeau reste affiché et l\u2019heure de début est imprimée sur la copie. Le professeur peut choisir un code pour en sortir'],
+  ]);
   h+='<h3>Pour les professeurs : fiches d\u2019exercices</h3>'+rows([
     ['Réglages → Mode professeur','survole une ligne et clique sur 🔓 pour en faire une ligne d\u2019<b>énoncé</b> protégée (🔒), puis enregistre la fiche (Ctrl+S) et donne le fichier aux élèves'],
     ['Côté élève','il ouvre la fiche (Ctrl+O) : l\u2019énoncé ne peut être ni modifié ni supprimé, il écrit ses réponses dessous. Ctrl+S crée <b>sa</b> copie « … - mes réponses », sans écraser la fiche'],
@@ -1777,6 +1789,7 @@ function renderHelp(){
   h+='<h3>Enregistrer et ouvrir</h3>'+rows([
     ['<kbd>Ctrl</kbd>+<kbd>S</kbd>','enregistrer le cahier dans un fichier <b>.mathdys</b> sur ton ordinateur. Les fois suivantes, le même fichier est mis à jour (Chrome, Edge) ou un nouveau est téléchargé (Firefox, Safari)'],
     ['<kbd>Ctrl</kbd>+<kbd>Maj</kbd>+<kbd>S</kbd>','enregistrer sous un autre nom'],
+    ['Exporter… → 💾 Sauvegarder tout le cahier','toutes tes pages dans un seul fichier, à garder sur une clé USB ou dans OneDrive. Pour les retrouver : 📂 Ouvrir ce fichier (rien n\u2019est effacé)'],
     ['<kbd>Ctrl</kbd>+<kbd>O</kbd>','ouvrir un cahier .mathdys — ou glisse le fichier sur la page'],
     ['Pastille rouge en haut','il y a des changements pas encore enregistrés dans le fichier'],
     ['Sur plusieurs appareils','enregistre tes cahiers dans ton dossier OneDrive, Google Drive ou celui de l\u2019ENT : tu les retrouves partout, sans compte MathDys'],
@@ -1847,6 +1860,8 @@ function preparePrint(){
   ph.querySelector('.ph-top span').textContent=state.settings.name||'';
   ph.querySelectorAll('.ph-top span')[1].textContent=d;
   ph.querySelector('h1').textContent=page().title||'';
+  const ex=page().exam; if(ex){ const n=document.createElement('div'); n.className='ph-exam';
+    n.textContent='Rédigé avec MathDys '+APP_VERSION+' en mode examen : commencé à '+hhmm(ex.start)+(ex.end?', terminé à '+hhmm(ex.end):'')+' — aides coupées'+(ex.calc?', calculatrice coupée':'')+(ex.graph?', graphiques coupés':'')+'.'; ph.append(n); }
   page().rows.forEach(r=>{ const el=els.get(r.id); if(el) el.classList.toggle('p-empty',isEmpty(r) || (r.type==='img'&&!r.value.src)); });
 }
 window.addEventListener('beforeprint',preparePrint);
@@ -1938,6 +1953,7 @@ function exportDoc(mathml){
 document.getElementById('exportSel').addEventListener('change',e=>{
   const v=e.target.value; e.target.value='';
   if(v==='txt') copyPage(false); else if(v==='latex') copyPage(true);
+  else if(v==='all') saveAll();
   else if(v==='word') exportDoc(true); else if(v==='odt') exportDoc(false); else if(v==='pdf') doPrint();
 });
 
@@ -1967,16 +1983,43 @@ async function saveFile(as){
     toast('Enregistrement impossible ici. Utilise « Exporter… → Copier » en attendant.');
   }
 }
+/* --- sauvegarde complète : toutes les pages dans un seul fichier --- */
+async function saveAll(){
+  const data=JSON.stringify({app:'MathDys',format:1,kind:'backup',version:APP_VERSION,saved:new Date().toISOString(),
+    pages:state.pages.map(p=>({title:p.title,subject:p.subject,rows:p.rows,exam:p.exam}))});
+  const name='MathDys - sauvegarde complète - '+new Date().toISOString().slice(0,10)+FILE_EXT;
+  try{
+    if(window.showSaveFilePicker){ const h=await window.showSaveFilePicker({suggestedName:name,types:FTYPES}); const w=await h.createWritable(); await w.write(data); await w.close(); }
+    else { const url=URL.createObjectURL(new Blob([data],{type:'application/json'})); const a=document.createElement('a'); a.href=url; a.download=name; document.body.append(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(url),3000); }
+    state.lastBackup=new Date().toISOString(); save();
+    toast('Sauvegarde complète : '+state.pages.length+' page'+(state.pages.length>1?'s':'')+' dans un seul fichier. Garde-le précieusement (clé USB, OneDrive…)');
+  }catch(e){ if(e&&e.name==='AbortError') return; toast('Sauvegarde impossible ici'); }
+}
+function restoreAll(d,name){
+  const list=d.pages.filter(p=>p&&Array.isArray(p.rows));
+  const same=(a,b)=>a.title===b.title && JSON.stringify(a.rows.map(r=>[r.type,r.value]))===JSON.stringify(b.rows.map(r=>[r.type,r.value]));
+  const fresh=list.filter(p=>!state.pages.some(q=>same(q,p)));
+  if(!fresh.length){ toast('Toutes les pages de cette sauvegarde sont déjà dans ton cahier'); return; }
+  ask('Ajouter '+fresh.length+' page'+(fresh.length>1?'s':'')+' de la sauvegarde « '+name+' » ? Tes pages actuelles sont gardées : rien n\u2019est effacé.',()=>{
+    let first=null;
+    fresh.forEach(p=>{ const np={id:uid(),title:p.title||'Sans titre',subject:p.subject,rows:p.rows.filter(r=>r&&KNOWN.includes(r.type)).map(r=>Object.assign({},r,{id:uid()})),exam:p.exam};
+      if(!np.rows.length) np.rows.push({id:uid(),type:'math',value:''}); state.pages.push(np); if(!first) first=np; });
+    state.pages=state.pages.filter(q=>q.dirty || q.fileName || q.rows.some(r=>!isEmpty(r)) || fresh.length===0);
+    state.current=first.id; renderPage(); save(); toast(fresh.length+' page'+(fresh.length>1?'s':'')+' restaurée'+(fresh.length>1?'s':''));
+  },{ok:'Restaurer'});
+}
 async function openFile(){
+  if(isExam() && !pendingExam) return examRefused('L\u2019ouverture d\u2019un fichier');
   if(window.showOpenFilePicker){
     try{ const [h]=await window.showOpenFilePicker({types:FTYPES.concat([{description:'JSON',accept:{'application/json':['.json']}}])});
       const f=await h.getFile(); loadFileText(await f.text(), h.name, h); }
-    catch(e){ if(!e || e.name!=='AbortError') document.getElementById('fileIn').click(); }
+    catch(e){ if(!e || e.name!=='AbortError') document.getElementById('fileIn').click(); else pendingExam=null; }
   } else document.getElementById('fileIn').click();
 }
 const KNOWN=Object.keys(BLOCKS);
 function loadFileText(txt,name,handle){
   let d=null; try{ d=JSON.parse(txt); }catch(e){}
+  if(d && d.app==='MathDys' && d.kind==='backup' && Array.isArray(d.pages)){ if(isExam()) return examRefused('La restauration'); restoreAll(d,name); return; }
   if(!d || d.app!=='MathDys' || !Array.isArray(d.rows)){ toast('« '+name+' » n\u2019est pas un cahier MathDys'); return; }
   const rows=d.rows.filter(r=>r&&KNOWN.includes(r.type)).map(r=>Object.assign({},r,{id:uid()}));
   if(!rows.length) rows.push({id:uid(),type:'math',value:''});
@@ -1991,6 +2034,8 @@ function loadFileText(txt,name,handle){
     handles.delete(p.id); p.fileName=null; p.dirty=true; p.suggest=name.replace(/\.mathdys$/i,'')+' - mes réponses'+FILE_EXT; }
   // retire la page vide de départ si elle n'a jamais servi
   state.pages=state.pages.filter(q=>q===p || q.dirty || q.fileName || q.rows.some(r=>!isEmpty(r)));
+  if(pendingExam && Date.now()-pendingExam.asked<10*60*1000){ finishExam(pendingExam,p); return; }
+  pendingExam=null;
   renderPage(); save();
   if(fiche) toast('Fiche d\u2019exercice : l\u2019énoncé est protégé. Écris tes réponses, puis Ctrl+S pour enregistrer TA copie.','OK',()=>{});
   else toast('« '+name+' » ouvert');
@@ -2005,6 +2050,7 @@ window.addEventListener('dragleave',e=>{ if(hasFiles(e) && --dragN<=0){ dragN=0;
 window.addEventListener('dragover',e=>{ if(hasFiles(e)) e.preventDefault(); });
 window.addEventListener('drop',async e=>{ if(!hasFiles(e)) return; e.preventDefault(); dragN=0; dropEl.classList.remove('on');
   const fs=[...e.dataTransfer.files]; if(!fs.length) return;
+  if(isExam()) return examRefused('Le glisser-déposer de fichiers');
   for(const f of fs){ if(/^image\//.test(f.type)) await addImage(f,currentId); else loadFileText(await f.text(), f.name, null); } });
 document.getElementById('imgIn').addEventListener('change',async e=>{ const f=e.target.files[0]; e.target.value=''; if(f) await addImage(f,imgTarget||currentId); imgTarget=null; });
 // coller une capture d'écran n'importe où
@@ -2023,6 +2069,51 @@ function toast(t,actLabel,actFn){
   toastT=setTimeout(()=>el.classList.remove('show','act'), actLabel?6000:1800);
 }
 
+/* ============ Mode examen : les aides qui donnent des réponses sont coupées ============ */
+// Ce n'est pas un verrou de sécurité (un élève très averti peut vider les données du navigateur) :
+// c'est un cadre clair et visible pour le professeur, avec l'heure de début imprimée sur la copie.
+const EX=()=>state.settings.exam||null;
+const isExam=()=>!!(state.settings.exam&&state.settings.exam.on);
+const examCut=what=>{ const x=EX(); if(!x||!x.on) return false; if(what==='calc') return !!x.calc; if(what==='graph') return !!x.graph; return true; };
+const hashCode=s=>{ let h=5381; for(const c of String(s)) h=((h<<5)+h+c.charCodeAt(0))|0; return String(h>>>0); };
+const hhmm=d=>new Date(d).toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'});
+function examRefused(what){ toast((what||'Cet outil')+' est désactivé en mode examen'); return true; }
+let pendingExam=null;
+function openExamDlg(){
+  if(isExam()){ quitExam(); return; }
+  document.getElementById('exCode').value=''; openDlg('examDlg');
+}
+function startExam(withFile){
+  const o={on:true, calc:document.getElementById('exCalc').checked, graph:document.getElementById('exGraph').checked,
+    code:document.getElementById('exCode').value.trim()?hashCode(document.getElementById('exCode').value.trim()):'', start:new Date().toISOString()};
+  document.getElementById('examDlg').classList.remove('open');
+  if(withFile){ o.asked=Date.now(); pendingExam=o; openFile(); return; }
+  const p=newPage(); p.title='Examen du '+new Date().toLocaleDateString('fr-FR'); p.subject='Examens';
+  p.rows=[{id:uid(),type:'math',value:''}]; state.pages.push(p); state.current=p.id; finishExam(o,p);
+}
+function finishExam(o,p){
+  o.page=p.id; p.exam={start:o.start,calc:o.calc,graph:o.graph}; state.settings.exam=o; pendingExam=null;
+  applyExam(); renderPage(); save(); const R=page().rows; focusRow(R[R.length-1].id,'end');
+  toast('Mode examen : les aides sont coupées. Bon courage !','OK',()=>{});
+}
+function quitExam(){
+  const x=EX(); if(!x) return;
+  const done=()=>{ const p=state.pages.find(q=>q.id===x.page); if(p&&p.exam) p.exam.end=new Date().toISOString();
+    state.settings.exam=null; applyExam(); renderPage(); save(); toast('Mode examen terminé'); };
+  if(x.code) ask('Code du professeur pour quitter le mode examen :',v=>{ if(hashCode((v||'').trim())===x.code) done(); else toast('Code incorrect'); },{input:true,placeholder:'code',ok:'Quitter'});
+  else ask('Quitter le mode examen ? Les aides seront de nouveau disponibles.',done,{ok:'Quitter'});
+}
+function applyExam(){
+  const on=isExam(), x=EX();
+  document.body.classList.toggle('exam',on);
+  const b=document.getElementById('examBar');
+  if(on){ b.hidden=false; b.querySelector('.ex-txt').textContent='MODE EXAMEN — commencé à '+hhmm(x.start)+' · aides coupées'+(x.calc?' · calculatrice coupée':'')+(x.graph?' · graphiques coupés':''); }
+  else b.hidden=true;
+  ['pageSel','newPage','openBtn'].forEach(id=>{ const el=document.getElementById(id); if(el) el.disabled=on; });
+  if(on && state.current!==x.page && state.pages.some(p=>p.id===x.page)) state.current=x.page;
+  renderTools();
+}
+
 /* ============ Signaler un bug ============ */
 function bugInfo(){
   const st=Object.assign({},state.settings); delete st.name; delete st.abbr;
@@ -2036,11 +2127,15 @@ function openBug(){
 function bugMessage(){ return (document.getElementById('bugTxt').value.trim()||'(décris ici le problème)')+'\n\n-----\n'+bugInfo(); }
 function updBugMail(){ document.getElementById('bugMail').href='mailto:git.public@protonmail.com?subject='+encodeURIComponent('MathDys '+APP_VERSION+' — bug ou idée')+'&body='+encodeURIComponent(bugMessage().slice(0,1800)); }
 document.getElementById('bugBtn').addEventListener('click',openBug);
+document.getElementById('exStart').addEventListener('click',()=>startExam(false));
+document.getElementById('examOpen').addEventListener('click',()=>{ document.getElementById('setDlg').classList.remove('open'); openExamDlg(); });
+document.getElementById('exFile').addEventListener('click',()=>startExam(true));
+document.getElementById('examQuit').addEventListener('click',quitExam);
 document.getElementById('bugTxt').addEventListener('input',updBugMail);
 document.getElementById('bugCopy').addEventListener('click',async()=>{ try{ await navigator.clipboard.writeText(bugMessage()); toast('Message copié : colle-le dans un mail à git.public@protonmail.com'); }catch(e){ toast('Copie refusée par le navigateur'); } });
 
 /* ============ Hors ligne : installation comme une application ============ */
-const APP_VERSION='1.0.0';
+const APP_VERSION='1.1.0';
 try{
   if('serviceWorker' in navigator && location.protocol==='https:' && window.self===window.top)
     navigator.serviceWorker.register('sw.js').catch(()=>{});
@@ -2073,6 +2168,12 @@ function runSelfTest(){
     const i1=relFunc(stepInfo('-2x<6')), i2=relFunc(stepInfo('x<-3'));
     eq('vérifier ses étapes : sens d\u2019inégalité oublié',i1&&i2&&equivalent(i1,i2,['x']),false); }
   eq('export texte lisible',latexToUnicode('x^{2}+\\sqrt2'),'x²+√2');
+  // mode examen
+  { const before=state.settings.exam; state.settings.exam={on:true,calc:true,graph:false};
+    eq('mode examen : aide-mémoire masqué',symsFor('lycee').some(x=>x.cat==='Formules'),false);
+    eq('mode examen : abréviations coupées',Object.keys(userAbbr()).length,0);
+    eq('mode examen : calculatrice coupée',examCut('calc'),true);
+    state.settings.exam=before; }
   // alignement
   eq('découpage au signe =',splitTopEq('3x+2=8').length,2);
   // opérations posées
@@ -2112,9 +2213,11 @@ function showSelfTest(){
 window.MathDysTest=runSelfTest;
 
 /* ============ Démarrage ============ */
-applySettings(); renderTools(); renderPage();
+applySettings(); renderTools(); if(isExam()) applyExam(); renderPage();
 refreshFileStatus();
-const start=()=>{ const R=page().rows; focusRow(R[R.length-1].id,'end'); if(location.hash==='#test') setTimeout(showSelfTest,600); else if(!state.seenHelp) openDlg('helpDlg'); };
+const backupReminder=()=>{ if(isExam()) return; const n=state.pages.filter(p=>p.rows.some(r=>!isEmpty(r))).length; const last=state.lastBackup?new Date(state.lastBackup):null;
+  if(n>=5 && (!last || Date.now()-last>30*864e5)) setTimeout(()=>toast('Pense à faire une sauvegarde complète de ton cahier ('+n+' pages)','Sauvegarder',saveAll),4000); };
+const start=()=>{ const R=page().rows; focusRow(R[R.length-1].id,'end'); backupReminder(); if(location.hash==='#test') setTimeout(showSelfTest,600); else if(!state.seenHelp) openDlg('helpDlg'); };
 if(window.customElements && customElements.whenDefined && MFE){ customElements.whenDefined('math-field').then(()=>setTimeout(start,150)); } else start();
 if(document.fonts && document.fonts.ready) document.fonts.ready.then(()=>setTimeout(alignAll,50));
 })();

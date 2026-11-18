@@ -33,9 +33,11 @@ Il est pensé pour les élèves dyspraxiques, dyslexiques et dyscalculiques, de 
 **Rendre son travail**
 - **Imprimer ou enregistrer en PDF** une copie propre (Ctrl+P)
 - **Exporter pour Word ou LibreOffice**, ou copier en texte lisible
+- **Sauvegarder tout le cahier** en un seul fichier, pour ne jamais rien perdre
 
 **Pour les professeurs**
 - **Fiches d'exercices** : des lignes d'énoncé protégées que l'élève complète, sans pouvoir écraser la fiche
+- **Mode examen** : les aides qui donnent des réponses sont coupées, l'heure de début est imprimée sur la copie
 
 **Confort**
 - **Pages rangées par matière**, **Mode simple**, **Annuler / Rétablir** pour tout le cahier, **déplacer les blocs**, **clavier de maths à l'écran** pour les tablettes

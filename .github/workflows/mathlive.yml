@@ -37,43 +37,4 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898283+github-actions[bot]@users.noreply.github.com"
           git add lib/mathlive
-          if git diff --cached --quiet; then echo "Déjà à jour."; else git commit -m "Éditeur de formules MathLive ${VERSION} rangé dans le dépôt" && git push; finame: Installer l'éditeur de formules
-
-on:
-  workflow_dispatch:
-
-permissions:
-  contents: write
-
-jobs:
-  installer:
-    runs-on: ubuntu-latest
-    env:
-      VERSION: "0.104.2"
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-
-      - name: Télécharger MathLive depuis npm
-        run: |
-          npm pack "mathlive@${VERSION}"
-          tar -xzf "mathlive-${VERSION}.tgz"
-          test -f package/dist/mathlive.min.js
-          rm -rf lib/mathlive
-          mkdir -p lib/mathlive
-          cp package/dist/mathlive.min.js lib/mathlive/
-          if [ -d package/dist/fonts ]; then cp -r package/dist/fonts lib/mathlive/fonts; fi
-          cp package/LICENSE* lib/mathlive/ 2>/dev/null || true
-          echo "MathLive ${VERSION} — https://mathlive.io — licence MIT" > lib/mathlive/LISEZMOI.txt
-          rm -rf package "mathlive-${VERSION}.tgz"
-          ls -la lib/mathlive
-
-      - name: Enregistrer dans le dépôt
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898283+github-actions[bot]@users.noreply.github.com"
-          git add lib/mathlive
           if git diff --cached --quiet; then echo "Déjà à jour."; else git commit -m "Éditeur de formules MathLive ${VERSION} rangé dans le dépôt" && git push; fi

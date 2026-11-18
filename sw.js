@@ -1,8 +1,9 @@
 /* MathDys — service worker : garde une copie du site pour qu'il marche sans Internet.
    Aucune donnée des cahiers ne passe par ici : seuls les fichiers du site sont mis en cache. */
-const VERSION = 'mathdys-1.3.0';
+const VERSION = 'mathdys-1.3.1';
 const CORE = ['./', './index.html', './style.css', './app.js', './manifest.webmanifest',
-              './icon.svg', './icon-192.png', './icon-512.png', './apple-touch-icon.png'];
+              './icon.svg', './icon-192.png', './icon-512.png', './apple-touch-icon.png',
+              './lib/mathlive/mathlive.min.js?v=0.104.2'];  // l'éditeur de formules du dépôt (ses polices sont gardées à la première utilisation)
 const CDN = ['cdn.jsdelivr.net', 'fonts.googleapis.com', 'fonts.gstatic.com'];
 
 self.addEventListener('install', e => {

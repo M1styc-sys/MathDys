@@ -31,7 +31,7 @@ Pas d'installation, pas de framework, pas de serveur : une page web statique.
 Le numéro de version est écrit à **trois endroits** qui doivent être identiques : `APP_VERSION` dans `app.js`, la balise `<meta name="mathdys-version">` dans `index.html`, et `VERSION` dans `sw.js`. Les liens vers `app.js?v=…` et `style.css?v=…` portent aussi ce numéro, pour que le navigateur ne mélange jamais deux versions. L'auto-test vérifie que la page et le code sont de la même version.
 
 ## Héberger l'éditeur de formules soi-même (facultatif)
-MathDys charge MathLive 0.104.2 depuis jsDelivr. Pour s'en passer, télécharger `https://cdn.jsdelivr.net/npm/mathlive@0.104.2/dist/mathlive.min.js` dans un dossier `lib/` et remplacer l'adresse dans `index.html` par `lib/mathlive.min.js`.
+MathDys charge d'abord la copie de MathLive 0.104.2 rangée dans `lib/mathlive/` ; si elle manque, il prend la même version sur jsDelivr. Cette copie est installée par l'action GitHub « Installer l'éditeur de formules » (onglet Actions → Run workflow), qui la télécharge depuis npm. Pour changer de version, modifier `VERSION` dans `.github/workflows/mathlive.yml` et la même version dans `index.html` (les deux balises `<script>` et le service worker), puis relancer l'action.
 
 ## Vérifier qu'on n'a rien cassé
 - Ouvre le site avec `#test` à la fin de l'adresse : tout doit être ✅.

@@ -1,5 +1,9 @@
 # Nouveautés de MathDys
 
+## Version 1.3.1 — plus aucune dépendance à un autre site
+- **Éditeur de formules rangé dans le dépôt** (`lib/mathlive/`, installé par l'action GitHub « Installer l'éditeur de formules ») : MathDys marche même si le réseau de l'établissement bloque jsDelivr, et hors ligne dès la première visite. Les formules utilisent maintenant les vraies polices de maths de MathLive.
+- Si la copie manque, MathDys reprend automatiquement la même version sur jsDelivr : rien ne casse.
+
 ## Version 1.3.0 — nouvelle identité « Signature »
 - **Nouveau logo** : « M » sur « D », séparés par un trait de fraction abricot. Nouvelle icône d'application et d'onglet.
 - **Une identité qu'on reconnaît** : le trait de fraction souligne l'onglet actif et les titres, la ligne en cours est **surlignée comme au stabilo**, et le fond est un **papier pointé** discret. Icônes fines à la place des émojis dans les barres d'outils.

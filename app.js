@@ -30,7 +30,7 @@
 try{
 (function(){
 'use strict';
-const APP_VERSION='1.3.0';
+const APP_VERSION='1.3.1';
 /* La page HTML et ce fichier doivent être de la même version. Si le navigateur a gardé un ancien fichier
    en mémoire (cache), on recharge une fois les bons fichiers au lieu de démarrer à moitié. */
 (function checkVersion(){
@@ -44,8 +44,9 @@ const APP_VERSION='1.3.0';
 const MFE = window.MathfieldElement || (window.MathLive && window.MathLive.MathfieldElement);
 if(!MFE){ document.getElementById('loaderr').style.display='block'; }
 else{
-  // Pas de polices ni de sons distants (bloqués ici) : MathLive utilise les polices du système.
-  try{ MFE.fontsDirectory = null; }catch(e){}
+  // Copie locale : ses propres polices de maths, rangées à côté (lib/mathlive/fonts).
+  // Copie jsDelivr : pas de polices distantes, MathLive utilise les polices du système.
+  if(!window.__mathliveLocal){ try{ MFE.fontsDirectory = null; }catch(e){} }
   try{ MFE.soundsDirectory = null; }catch(e){}
   try{ MFE.keypressSound = null; MFE.plonkSound = null; }catch(e){}
   try{ MFE.decimalSeparator = ','; }catch(e){}
@@ -2490,6 +2491,7 @@ function runSelfTest(){
   ok('thème automatique : suit l’ordinateur',(()=>{ const t=state.settings.theme; state.settings.theme='auto'; const r=themeNow()===(darkMQ.matches?'sombre':'clair'); state.settings.theme=t; return r; })());
   ok('logo présent dans la barre',!!document.querySelector('header .logo'));
   ok('éditeur de formules MathLive chargé',!!MFE,'MathLive ne s’est pas chargé');
+  if(MFE) ok('éditeur de formules : copie du dépôt (sans autre site)',!!window.__mathliveLocal || location.protocol==='file:','chargé depuis jsDelivr : lance l’action « Installer l’éditeur de formules » sur GitHub');
   ok('enregistrement dans le navigateur',canStore);
   return res;
 }

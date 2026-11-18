@@ -12,10 +12,13 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Andika&family=Atkinson+Hyperlegible:wght@400;700&family=Lexend:wght@400;600&display=swap" rel="stylesheet">
-<meta name="mathdys-version" content="1.3.0">
-<!-- Éditeur de formules MathLive 0.104.2 (version figée : une mise à jour de leur côté ne peut pas casser MathDys) -->
-<script src="https://cdn.jsdelivr.net/npm/mathlive@0.104.2/dist/mathlive.min.js"></script>
-<link rel="stylesheet" href="style.css?v=1.3.0">
+<meta name="mathdys-version" content="1.3.1">
+<!-- Éditeur de formules MathLive 0.104.2 (version figée).
+     D'abord la copie rangée dans le dépôt (lib/mathlive/, installée par l'action « Installer l'éditeur de formules ») :
+     MathDys ne dépend alors d'aucun autre site. Si elle manque, on prend la même version sur jsDelivr. -->
+<script src="lib/mathlive/mathlive.min.js?v=0.104.2" onload="window.__mathliveLocal=true"></script>
+<script>if(!window.MathfieldElement&&!window.MathLive){document.write('<script src="https://cdn.jsdelivr.net/npm/mathlive@0.104.2/dist/mathlive.min.js"><\/script>');}</script>
+<link rel="stylesheet" href="style.css?v=1.3.1">
 </head>
 <body>
 <div class="exambar" id="examBar" hidden role="status"><span class="ex-txt"></span><button class="btn" id="examQuit">Quitter le mode examen</button></div>
@@ -186,6 +189,6 @@
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 <div class="drop" id="drop">Lâche le fichier ici pour l’ouvrir</div>
 
-<script src="app.js?v=1.3.0"></script>
+<script src="app.js?v=1.3.1"></script>
 </body>
 </html>
